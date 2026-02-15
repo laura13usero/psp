@@ -1,0 +1,1 @@
+Estructura MUY simple de servidor que acepta SOLO a un cliente (sin bucle).

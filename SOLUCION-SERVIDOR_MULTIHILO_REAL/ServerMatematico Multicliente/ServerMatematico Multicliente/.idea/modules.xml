@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/ServerMatematico Multicliente.iml" filepath="$PROJECT_DIR$/.idea/ServerMatematico Multicliente.iml" />
+      <module fileurl="file://$PROJECT_DIR$/ServerMatematico Multicliente/ServerMetematico/ServerMetematico.iml" filepath="$PROJECT_DIR$/ServerMatematico Multicliente/ServerMetematico/ServerMetematico.iml" />
+      <module fileurl="file://$PROJECT_DIR$/ServerMetematico/ServerMetematico1.iml" filepath="$PROJECT_DIR$/ServerMetematico/ServerMetematico1.iml" />
+      <module fileurl="file://$PROJECT_DIR$/ServerMatematico Multicliente/mi1ersocket/mi1ersocket.iml" filepath="$PROJECT_DIR$/ServerMatematico Multicliente/mi1ersocket/mi1ersocket.iml" />
+      <module fileurl="file://$PROJECT_DIR$/mi1ersocket/mi1ersocket1.iml" filepath="$PROJECT_DIR$/mi1ersocket/mi1ersocket1.iml" />
+    </modules>
+  </component>
+</project>
