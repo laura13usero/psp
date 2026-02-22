@@ -1,0 +1,504 @@
+================================================================================
+  GUIA DE PREPARACION PARA LA PRUEBA DE AUTORIA
+  "EL DRAGON ARRASA ROEDALIA"
+  Escenarios posibles y como resolverlos paso a paso
+================================================================================
+
+CONTEXTO: La prueba sera una MODIFICACION del trabajo "La Chispa Adecuada".
+Basandonos en la imagen (un dragon arrasando Roedalia en llamas con ratones
+caballeros haciendo frente), estos son TODOS los escenarios posibles que se
+me ocurren, con instrucciones paso a paso para resolverlos.
+
+================================================================================
+ESCENARIO 1: NUEVO PERSONAJE - EL DRAGON (HILO/SERVIDOR NUEVO)
+================================================================================
+
+DESCRIPCION: Anadir un dragon como nuevo personaje que ataca Roedalia.
+El dragon seria un hilo que periodicamente ataca lugares/personajes.
+
+COMO HACERLO PASO A PASO:
+
+1. Crear HiloDragon.java en Clientes/src/:
+   - extends Thread (igual que todos los demas)
+   - Atributos: nombre, puntosVida, nivelFuria, etc.
+   - En run(): bucle con acciones aleatorias:
+     * Volar sobre Roedalia (Thread.sleep)
+     * Atacar un lugar (conectarse por socket al servidor del lugar)
+     * Atacar a un personaje (escribir en buzon compartido)
+
+2. Posibles acciones del dragon:
+   - ARRASAR MERCADO: conectar por socket al ServidorMercado
+     Socket skMercado = new Socket(HOST, PUERTO_MERCADO);
+     salida.writeUTF("ATAQUE_DRAGON");
+     -> Necesitarias anadir un case "ATAQUE_DRAGON" en HiloMercado
+
+   - ATACAR PORTON NORTE: igual, conectar por socket al ServidorPortonNorte
+     -> Anadir case "ATAQUE_DRAGON" en HiloPorton
+
+   - ATACAR TABERNA: conectar al servidor Taberna
+     -> Anadir case "ATAQUE_DRAGON" en HiloTaberna
+     -> Podria destruir la taberna temporalmente (flag "tabernaDestruida")
+
+   - ATACAR A ELISABETHA: usar buzon compartido
+     synchronized(ClienteMaestro.lockElisabetha) {
+         ClienteMaestro.hayAtaqueDragonE = true;
+         // wait/notifyAll
+     }
+
+   - ATACAR A LANCE: usar buzon compartido
+     synchronized(ClienteMaestro.lockLance) {
+         ClienteMaestro.hayAtaqueDragonL = true;
+     }
+
+3. En ClienteMaestro.java anadir:
+   - Nuevas variables compartidas: hayAtaqueDragonE, hayAtaqueDragonL
+   - Crear el hilo: HiloDragon dragon = new HiloDragon(); dragon.start();
+
+4. En HiloElisabetha/HiloLance: comprobar al inicio de cada iteracion
+   si hay ataque del dragon y reaccionar (bajar chispa, huir, etc.)
+
+
+================================================================================
+ESCENARIO 2: NUEVO LUGAR - CAMPO DE BATALLA CONTRA EL DRAGON
+================================================================================
+
+DESCRIPCION: Crear un nuevo servidor "CampoBatalla" donde los caballeros
+(Lance + Caballero1..4) luchan contra el dragon.
+
+COMO HACERLO PASO A PASO:
+
+1. En Servidores/src/ crear:
+   - HiloServidorBatalla.java (implements Runnable):
+     * Similar a HiloServidorTaberna
+     * ServerSocket en puerto nuevo (ej: 5003)
+     * accept() en bucle, lanzar HiloBatalla por cada conexion
+
+   - HiloBatalla.java (extends Thread):
+     * Protocolo: UNIRSE_BATALLA, ATACAR_DRAGON, CONSULTAR_VIDA_DRAGON, etc.
+     * Objeto compartido: ControlDragon (vida del dragon, synchronized)
+
+   - ControlDragon.java (monitor synchronized):
+     * private int vidaDragon = 500; // o lo que digan
+     * public synchronized void recibirAtaque(int dano) { vidaDragon -= dano; notifyAll(); }
+     * public synchronized boolean dragonVivo() { return vidaDragon > 0; }
+     * public synchronized void esperarVictoria() { while(vidaDragon > 0) wait(); }
+
+2. En ServidorMaestro.java anadir:
+   public static final int PUERTO_BATALLA = 5003;
+   ControlDragon controlDragon = new ControlDragon();
+   Thread hiloBatalla = new Thread(new HiloServidorBatalla(PUERTO_BATALLA, controlDragon));
+   hiloBatalla.start();
+
+3. En ClienteMaestro.java anadir:
+   public static final int PUERTO_BATALLA = 5003;
+
+4. En HiloLance.java anadir nueva accion:
+   - case 3: irACampoBatalla(); -> conectar por socket a PUERTO_BATALLA
+   - Cambiar random.nextInt(3) por random.nextInt(4)
+
+5. En HiloCaballero.java anadir accion:
+   - Poder ir al campo de batalla tambien
+
+
+================================================================================
+ESCENARIO 3: LOS CABALLEROS SE UNEN CONTRA EL DRAGON (COORDINACION DE HILOS)
+================================================================================
+
+DESCRIPCION: Los 4 caballeros + Lance deben coordinarse para atacar al dragon.
+Solo pueden atacar cuando TODOS estan en el campo de batalla.
+
+COMO HACERLO (patron BARRERA / wait-notifyAll):
+
+1. Crear ControlBatalla.java (monitor):
+   private int caballerosListos = 0;
+   private boolean lanceListo = false;
+
+   public synchronized void caballeroListo() {
+       caballerosListos++;
+       if (caballerosListos >= 4 && lanceListo) notifyAll(); // Todos listos!
+       while (caballerosListos < 4 || !lanceListo) {
+           try { wait(); } catch(InterruptedException e) {}
+       }
+   }
+
+   public synchronized void lanceListo() {
+       lanceListo = true;
+       if (caballerosListos >= 4) notifyAll();
+       while (caballerosListos < 4) {
+           try { wait(); } catch(InterruptedException e) {}
+       }
+   }
+
+   ESTO ES UNA BARRERA: todos los hilos esperan hasta que el ultimo llega.
+   Igual que el Contador de Mis100Hilos pero con condicion distinta.
+
+
+================================================================================
+ESCENARIO 4: DRAGON COMO SERVIDOR INDEPENDIENTE (VERSION DISTRIBUIDA)
+================================================================================
+
+DESCRIPCION: El dragon es un servidor al que los caballeros se conectan para
+luchar. El dragon acepta conexiones y "pelea" con cada caballero.
+
+COMO HACERLO:
+
+1. Crear ServidorDragon/ con:
+   - Main.java: ServerSocket en puerto 5003
+   - HiloDragon.java: extends Thread, atiende a cada caballero
+     * Protocolo: ATACAR -> el dragon recibe dano y responde con contraataque
+     * Dragon tiene vidaDragon (synchronized)
+     * Cuando vidaDragon <= 0 -> enviar "DRAGON_DERROTADO"
+
+2. Los caballeros/Lance se conectan como clientes:
+   Socket skDragon = new Socket(hostDragon, puertoDragon);
+   salida.writeUTF("ATACAR");
+   salida.writeInt(danoCaballero); // 10-30 aleatorio
+   String respuesta = entrada.readUTF(); // "CONTRAATAQUE" o "DRAGON_DERROTADO"
+   if (respuesta.equals("CONTRAATAQUE")) {
+       int danoRecibido = entrada.readInt();
+       // Bajar vida del caballero
+   }
+
+
+================================================================================
+ESCENARIO 5: EL DRAGON DESTRUYE LUGARES (MODIFICAR SERVIDORES EXISTENTES)
+================================================================================
+
+DESCRIPCION: El dragon ataca y destruye temporalmente los servidores existentes
+(Mercado quemado, Porton derribado, Taberna en llamas).
+
+COMO HACERLO:
+
+1. En cada servidor, anadir un flag "destruido":
+   En HiloServidorMercado/HiloServidorTaberna/HiloServidorPorton:
+   public static volatile boolean destruido = false;
+
+2. Anadir case "ATAQUE_DRAGON" en los HiloMercado/HiloTaberna/HiloPorton:
+   case "ATAQUE_DRAGON":
+       destruido = true;
+       salida.writeUTF("LUGAR_DESTRUIDO");
+       // Reconstruccion tras 30 segundos:
+       new Thread(() -> {
+           try { Thread.sleep(30000); } catch(InterruptedException e) {}
+           destruido = false;
+           System.out.println("Lugar reconstruido!");
+       }).start();
+       break;
+
+3. En las acciones normales, comprobar si destruido:
+   case "VISITAR_MERCADO":
+       if (destruido) {
+           salida.writeUTF("MERCADO_DESTRUIDO");
+           break;
+       }
+       // ...atencion normal...
+
+4. En los clientes (HiloElisabetha, etc.) manejar la respuesta:
+   String resp = entrada.readUTF();
+   if (resp.equals("MERCADO_DESTRUIDO")) {
+       System.out.println("[ELISABETHA] El mercado esta en llamas! No puede comprar.");
+       return;
+   }
+
+
+================================================================================
+ESCENARIO 6: ELISABETHA Y LANCE DEBEN UNIR FUERZAS (MODIFICAR CONDICION FINAL)
+================================================================================
+
+DESCRIPCION: Ademas de llegar a chispa 100, ahora para el final feliz
+tambien hay que derrotar al dragon. Nueva condicion de fin:
+ambos a chispa 100 Y dragon derrotado.
+
+COMO HACERLO:
+
+1. En ControlTaberna.java anadir:
+   private boolean dragonDerrotado = false;
+
+   public synchronized void dragonDerrotado() {
+       dragonDerrotado = true;
+       notifyAll();
+   }
+
+   // Modificar esperarAlOtro():
+   public synchronized void esperarAlOtro(String personaje) {
+       // Esperar a que ambos esten a 100 Y el dragon este derrotado
+       while (!lance100 || !elisabetha100 || !dragonDerrotado) {
+           try { wait(); } catch(InterruptedException e) {}
+       }
+       // FINAL FELIZ
+   }
+
+2. Cuando el dragon muera (vidaDragon <= 0), el servidor notifica:
+   control.dragonDerrotado();
+
+
+================================================================================
+ESCENARIO 7: NUEVO ATRIBUTO "VALOR" PARA LANCE Y CABALLEROS
+================================================================================
+
+DESCRIPCION: Ademas de chispa, Lance tiene un atributo "valor" que sube
+cuando lucha contra el dragon y baja cuando pierde combates.
+
+COMO HACERLO:
+
+1. En HiloLance.java anadir:
+   private int nivelValor = 0;
+
+   // En cada combate con el dragon:
+   nivelValor += 15;  // sube
+
+   // Si pierde un combate:
+   nivelValor = Math.max(0, nivelValor - 10);
+
+   // Condicion: Lance necesita valor >= 50 para enfrentar al dragon
+   if (nivelValor >= 50) {
+       // Puede ir al campo de batalla
+   }
+
+
+================================================================================
+ESCENARIO 8: LOS ALQUIMISTAS SE ALIAN CON EL DRAGON
+================================================================================
+
+DESCRIPCION: Los alquimistas ahora tambien pueden crear pociones para
+fortalecer al dragon (ademas de danar a Elisabetha/Lance).
+
+COMO HACERLO:
+
+1. En HiloAlquimista.java anadir nueva accion:
+   - Estudiar calderos ahora tambien puede crear pocion para el dragon (20%)
+   - Nueva accion: visitarDragon() -> conectar por socket al ServidorDragon
+     salida.writeUTF("POCION_CURACION");
+     salida.writeInt(50); // curar 50 puntos al dragon
+     -> El dragon recupera vida
+
+2. Cambiar las probabilidades:
+   50% estudiar, 15% Elisabetha, 15% Lance, 20% Dragon
+
+
+================================================================================
+ESCENARIO 9: NUEVO LUGAR - ARMERIA (COMPRAR ARMAS CONTRA EL DRAGON)
+================================================================================
+
+DESCRIPCION: Un nuevo servidor "Armeria" donde Lance y los caballeros
+compran armas especiales para luchar contra el dragon.
+
+COMO HACERLO:
+
+1. Crear HiloServidorArmeria.java y HiloArmeria.java
+   - Igual que HiloServidorMercado/HiloMercado pero con armas:
+     String[] ARMAS = {"espada de fuego", "escudo de diamante",
+                       "lanza del dragon", "armadura ignifuga", "arco encantado"};
+
+   - Protocolo: VISITAR_ARMERIA + nombre -> ofrecer armas -> elegir una
+   - El arma elegida aumenta el dano del caballero en la batalla
+
+2. En ServidorMaestro: nuevo puerto 5004
+3. En HiloLance/HiloCaballero: nueva accion "irAArmeria()"
+
+
+================================================================================
+ESCENARIO 10: EVACUACION DE ROEDALIA (TODOS LOS PERSONAJES COOPERAN)
+================================================================================
+
+DESCRIPCION: Cuando el dragon ataca, los personajes civiles (Damas)
+deben evacuar via el Porton Norte. Las Damas cambian su comportamiento
+y en lugar de hablar con Elisabetha, evacuan.
+
+COMO HACERLO:
+
+1. Anadir flag global: public static volatile boolean dragonAtacando = false;
+
+2. En HiloDama.java, en el bucle run():
+   if (ClienteMaestro.dragonAtacando) {
+       evacuar(); // nueva funcion
+   } else {
+       // comportamiento normal
+   }
+
+   private void evacuar() {
+       System.out.println("[" + nombreDama + "] Evacua por el Porton Norte!");
+       try {
+           Socket skPorton = new Socket(HOST, PUERTO_PORTON);
+           DataOutputStream salida = new DataOutputStream(skPorton.getOutputStream());
+           DataInputStream entrada = new DataInputStream(skPorton.getInputStream());
+           salida.writeUTF("EVACUAR");
+           salida.writeUTF(nombreDama);
+           entrada.readUTF(); // OK
+           salida.writeUTF("DESCONECTAR");
+           entrada.readUTF();
+           skPorton.close();
+       } catch(IOException e) { ... }
+       Thread.sleep(5000);
+   }
+
+3. En HiloPorton: anadir case "EVACUAR"
+
+
+================================================================================
+ESCENARIO 11: EL DRAGON TIENE FASES (PROGRESION DE DIFICULTAD)
+================================================================================
+
+DESCRIPCION: El dragon tiene 3 fases de dificultad (como un boss de videojuego).
+Fase 1: Dragon joven (menos dano). Fase 2: Dragon enfurecido. Fase 3: Dragon ancestral.
+
+COMO HACERLO:
+
+En ControlDragon.java:
+   private int vidaDragon = 300; // Total: 100+100+100
+
+   public synchronized int getFase() {
+       if (vidaDragon > 200) return 1;      // Fase 1: > 200 vida
+       else if (vidaDragon > 100) return 2;  // Fase 2: 100-200
+       else return 3;                        // Fase 3: < 100
+   }
+
+   public synchronized int getDanoDragon() {
+       switch(getFase()) {
+           case 1: return 5;   // Poco dano
+           case 2: return 15;  // Medio
+           case 3: return 30;  // Mucho
+           default: return 10;
+       }
+   }
+
+
+================================================================================
+ESCENARIO 12: MENSAJE DE SOCORRO (COMUNICACION ENTRE SERVIDORES)
+================================================================================
+
+DESCRIPCION: Cuando el dragon ataca un lugar, ese servidor envia un mensaje
+de socorro a los demas servidores (comunicacion servidor-servidor).
+
+COMO HACERLO:
+
+   // En HiloMercado, al ser atacado:
+   case "ATAQUE_DRAGON":
+       // Enviar socorro al Porton Norte
+       Socket skSocorro = new Socket("localhost", 5002);
+       DataOutputStream salidaSocorro = new DataOutputStream(skSocorro.getOutputStream());
+       salidaSocorro.writeUTF("SOCORRO");
+       salidaSocorro.writeUTF("MERCADO");
+       skSocorro.close();
+       break;
+
+   // En HiloPorton, recibir socorro:
+   case "SOCORRO":
+       String lugarAtacado = entrada.readUTF();
+       System.out.println("[PORTON] Socorro! El " + lugarAtacado + " esta siendo atacado!");
+       // Alertar a los caballeros
+       break;
+
+
+================================================================================
+RESUMEN: CONCEPTOS CLAVE QUE DEBES DOMINAR PARA CUALQUIER ESCENARIO
+================================================================================
+
+1. CREAR UN NUEVO HILO:
+   - Crear clase que extends Thread
+   - Sobreescribir run()
+   - En ClienteMaestro: new MiHilo(); miHilo.start();
+
+2. CREAR UN NUEVO SERVIDOR:
+   - Crear HiloServidorXXX (implements Runnable) con ServerSocket + accept()
+   - Crear HiloXXX (extends Thread) con el protocolo (switch de comandos)
+   - En ServidorMaestro: nuevo Thread(new HiloServidorXXX(puerto)).start()
+
+3. ANADIR COMUNICACION POR SOCKETS (cliente -> servidor):
+   // LADO CLIENTE:
+   Socket sk = new Socket(host, puerto);
+   DataOutputStream salida = new DataOutputStream(sk.getOutputStream());
+   DataInputStream entrada = new DataInputStream(sk.getInputStream());
+   salida.writeUTF("COMANDO");      // Enviar comando
+   String resp = entrada.readUTF();  // Recibir respuesta
+   sk.close();
+
+   // LADO SERVIDOR (en HiloXXX.run()):
+   String comando = entrada.readUTF();  // Recibir comando
+   switch(comando) {
+       case "COMANDO":
+           // Procesar
+           salida.writeUTF("RESPUESTA");
+           break;
+   }
+
+4. ANADIR VARIABLE COMPARTIDA (comunicacion entre hilos):
+   // En ClienteMaestro:
+   public static final Object lockNuevo = new Object();
+   public static boolean hayEvento = false;
+
+   // Hilo que ESCRIBE:
+   synchronized(ClienteMaestro.lockNuevo) {
+       ClienteMaestro.hayEvento = true;
+       ClienteMaestro.lockNuevo.notifyAll(); // Despertar al que espera
+   }
+
+   // Hilo que LEE:
+   synchronized(ClienteMaestro.lockNuevo) {
+       while(!ClienteMaestro.hayEvento) {
+           ClienteMaestro.lockNuevo.wait(); // Dormirse hasta que haya evento
+       }
+       // Procesar evento
+       ClienteMaestro.hayEvento = false;
+       ClienteMaestro.lockNuevo.notifyAll();
+   }
+
+5. ANADIR NUEVO ATRIBUTO A UN PERSONAJE:
+   private int nuevoAtributo = 0;
+   // Modificarlo en las acciones correspondientes
+   // Si se necesita compartir: ponerlo en ClienteMaestro como static
+
+6. MODIFICAR CONDICION DE FIN:
+   // En ControlTaberna.esperarAlOtro():
+   while(!condicion1 || !condicion2 || !condicion3) {
+       wait();
+   }
+   // Cada condicion se activa con notifyAll() desde otro metodo
+
+7. ANADIR NUEVA ACCION A UN PERSONAJE:
+   // En HiloLance (o quien sea):
+   int accion = random.nextInt(4); // Era nextInt(3), ahora 4 opciones
+   switch(accion) {
+       // ...cases existentes...
+       case 3:
+           nuevaAccion(); // Tu nueva funcion
+           break;
+   }
+
+8. CREAR OBJETO COMPARTIDO (MONITOR) NUEVO:
+   public class ControlNuevo {
+       private int recurso;
+
+       public synchronized void modificar(int valor) {
+           recurso += valor;
+           notifyAll();
+       }
+
+       public synchronized void esperar(int objetivo) {
+           while(recurso < objetivo) {
+               try { wait(); } catch(InterruptedException e) {}
+           }
+       }
+   }
+
+
+================================================================================
+CHECKLIST RAPIDO PARA EL EXAMEN
+================================================================================
+
+[ ] Se donde estan TODOS los archivos y que hace cada uno
+[ ] Se como crear un nuevo Thread (extends Thread, run(), start())
+[ ] Se como crear un nuevo ServerSocket (accept en bucle, hilo por cliente)
+[ ] Se como usar Socket + DataInputStream/DataOutputStream
+[ ] Se como anadir un case nuevo en un switch de protocolo
+[ ] Se como crear variables compartidas con synchronized + wait + notifyAll
+[ ] Se la diferencia entre comunicacion por SOCKET (entre procesos/servidores)
+    y comunicacion por VARIABLES COMPARTIDAS (entre hilos del mismo proceso)
+[ ] Se como modificar la condicion de fin en ControlTaberna.esperarAlOtro()
+[ ] Se como anadir un nuevo personaje al ClienteMaestro
+[ ] Se como anadir un nuevo servidor al ServidorMaestro
+[ ] Entiendo que volatile hace que todos los hilos vean el cambio inmediatamente
+[ ] Entiendo que join() hace que el hilo actual espere a que otro termine
+
+================================================================================
+
