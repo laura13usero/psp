@@ -23,7 +23,7 @@ public class ClienteMaestro {
     public static boolean hayPeticionDama = false;     // Flag: hay una dama esperando ser atendida?
     public static boolean hayPeticionAlquimistaE = false; // Flag: un alquimista quiere ver a Elisabetha?
     public static String mensajeAlquimistaE = null;    // Tipo: POCION
-    public static int chispaElisabetha = 0;            // Copia de la chispa para que alquimistas la consulten
+public static int chispaElisabetha = 0;            // Copia de la chispa para que alquimistas la consulten
 
     // === BUZON COMPARTIDO: Lance <-> Caballeros/Alquimistas ===
     public static final Object lockLance = new Object();

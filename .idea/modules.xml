@@ -3,6 +3,8 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/psp.iml" filepath="$PROJECT_DIR$/.idea/psp.iml" />
+      <module fileurl="file://$PROJECT_DIR$/LaChispaAdecuada-Unificada/Clientes/Clientes.iml" filepath="$PROJECT_DIR$/LaChispaAdecuada-Unificada/Clientes/Clientes.iml" />
+      <module fileurl="file://$PROJECT_DIR$/LaChispaAdecuada-Unificada/Servidores/Servidores.iml" filepath="$PROJECT_DIR$/LaChispaAdecuada-Unificada/Servidores/Servidores.iml" />
     </modules>
   </component>
 </project>

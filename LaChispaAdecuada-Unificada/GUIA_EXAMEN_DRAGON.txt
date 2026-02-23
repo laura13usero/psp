@@ -483,6 +483,355 @@ RESUMEN: CONCEPTOS CLAVE QUE DEBES DOMINAR PARA CUALQUIER ESCENARIO
 
 
 ================================================================================
+ESCENARIOS DE UN COMPAÑERO - REGLAS Y CODIGO YA PREPARADO
+================================================================================
+
+Un compañero ha planteado dos REGLAS fundamentales para decidir donde colocar
+el hilo del Dragon segun lo que ataque:
+
+  * Regla A: Si el Dragon ataca a una PERSONA (Lance, Elisabetha), el hilo
+    del Dragon debe crearse en el paquete CLIENTES.
+
+  * Regla B: Si el Dragon ataca a un LUGAR (Porton, Taberna, Mercado), el hilo
+    del Dragon debe crearse en el paquete SERVIDORES.
+
+A continuacion se detallan los 3 escenarios ya programados que ha preparado.
+
+
+================================================================================
+ESCENARIO COMPAÑERO 1: DRAGON COMO ENEMIGO LOCAL (REGLA A)
+                       Ataca directamente a Lance (hilo en Clientes)
+================================================================================
+
+DESCRIPCION: El Dragon Carmesi aparece de vez en cuando para quemar a Lance
+y bajarle la chispa, a menos que Lance se defienda. Es un Thread que vive
+en la misma consola que Lance (paquete clientes), igual que un Alquimista.
+
+COMO HACERLO PASO A PASO:
+
+1. Crear DragonCarmesi.java en Clientes/src/:
+
+   Seria un hilo que recibe una referencia directa al hilo de Lance.
+   Mientras Lance no llegue a 100 de chispa, el dragon ataca cada 15 seg.
+
+   public class DragonCarmesi extends Thread {
+       private HiloLance caballero;
+
+       public DragonCarmesi(HiloLance caballero) {
+           this.caballero = caballero;
+       }
+
+       @Override
+       public void run() {
+           while (caballero != null && caballero.getNivelChispa() < 100) {
+               try { Thread.sleep(15000); } catch (InterruptedException e) {}
+
+               System.out.println("DRAGON: El Dragon Carmesi cae en picado hacia Lance!");
+
+               // 40% de que Lance se defienda, 60% de que le queme
+               if (Math.random() < 0.40) {
+                   System.out.println("LANCE: Alza su escudo y repele el fuego. +15 chispa!");
+                   caballero.modificarChispa(15);
+               } else {
+                   System.out.println("DRAGON: Fuego! Lance sufre quemaduras. -30 chispa.");
+                   caballero.modificarChispa(-30);
+               }
+           }
+           System.out.println("DRAGON: El Dragon Carmesi huye hacia las montanas.");
+       }
+   }
+
+   NOTA: Se necesita que HiloLance tenga un metodo getNivelChispa() y
+   modificarChispa(int cantidad) accesibles publicamente. Si ya los tienes
+   como private, habria que ponerlos public o crear getters.
+
+2. Como arrancarlo:
+   En ClienteMaestro.java, justo despues de crear lance:
+
+   HiloLance lance = new HiloLance();
+   lance.start();
+   new DragonCarmesi(lance).start();  // <--- AÑADIR ESTA LINEA
+
+   Asi el dragon se ejecuta como un hilo mas dentro del mismo proceso.
+
+
+================================================================================
+ESCENARIO COMPAÑERO 2: DRAGON ATACA UN LUGAR (REGLA B)
+                       Bloquea el Porton Norte (hilo en Servidores)
+================================================================================
+
+DESCRIPCION: El Dragon Carmesi bloquea el Porton Norte. Si un caballero
+va a vigilar mientras el dragon esta atacando, no puede inspeccionar
+carretas. Como el Porton esta en el Servidor, el Dragon es una clase
+en el paquete servidores.
+
+COMO HACERLO PASO A PASO:
+
+1. Modificar el servidor del Porton Norte para anadir el ataque:
+
+   En la clase que gestiona el Porton (ej: HiloPorton.java o la clase
+   equivalente donde se gestionan las carretas), anadir:
+
+   private boolean dragonAtacando = false;
+
+   // Metodo que usara el hilo del Dragon
+   public synchronized void ataqueDelDragon() {
+       dragonAtacando = true;
+       System.out.println("DRAGON: El Dragon Carmesi esta quemando el Porton Norte!");
+
+       try { Thread.sleep(8000); } catch (Exception e) {}  // Quema 8 segundos
+
+       dragonAtacando = false;
+       System.out.println("DRAGON: El Dragon Carmesi se aleja del porton.");
+   }
+
+   Y en el metodo de inspeccionar carreta, anadir esta comprobacion al principio:
+
+   public synchronized String inspeccionarCarreta(String nombreGuardia) {
+       if (dragonAtacando) {
+           return nombreGuardia + " llega al Porton pero esta LLENO DE FUEGO. Huye!";
+       }
+       // ... (resto del codigo normal de inspeccionar carretas) ...
+   }
+
+   CLAVE: Al ser synchronized, mientras el dragon esta atacando (8 seg dentro
+   de ataqueDelDragon), ningun caballero puede entrar a inspeccionarCarreta
+   porque el lock esta ocupado. Esto es EXACTAMENTE el patron de monitor
+   que hemos visto en clase.
+
+2. Crear DragonCarmesi.java en Servidores/src/:
+
+   public class DragonCarmesi extends Thread {
+       private HiloPorton porton;  // o el nombre de tu clase del porton
+
+       public DragonCarmesi(HiloPorton porton) {
+           this.porton = porton;
+       }
+
+       @Override
+       public void run() {
+           while (true) {
+               try { Thread.sleep(20000); } catch (Exception e) {}
+               porton.ataqueDelDragon();
+           }
+       }
+   }
+
+   El dragon ataca cada 20 segundos, llamando al metodo synchronized del porton.
+
+3. Como arrancarlo:
+   En el Main.java del Servidor, justo despues de crear el porton:
+
+   HiloPorton portonCompartido = new HiloPorton();
+   // ... (lo que ya tengas) ...
+   new DragonCarmesi(portonCompartido).start();  // <--- AÑADIR ESTA LINEA
+
+
+================================================================================
+ESCENARIO COMPAÑERO 3: SECUESTRO DE ELISABETHA + RESCATE DE LANCE
+                       (Torre del Dragon con wait/notifyAll)
+================================================================================
+
+DESCRIPCION: Se crea una "Torre del Dragon" como nuevo recurso en el servidor.
+Elisabetha puede ser secuestrada al pasear (se congela con wait()) y Lance
+puede ir a rescatarla (la libera con notifyAll()). Usa comunicacion
+por sockets y sincronizacion con monitores.
+
+COMO HACERLO PASO A PASO:
+
+--- PASO 1: Crear TorreDelDragon.java en Servidores/src/ ---
+
+   Es un monitor (objeto compartido con synchronized) donde:
+   - serSecuestrada() congela el hilo con wait()
+   - rescatar() lo libera con notifyAll()
+
+   public class TorreDelDragon {
+       private boolean princesaSecuestrada = false;
+
+       // Cuando Elisabetha es secuestrada, llama a esto
+       public synchronized void serSecuestrada() {
+           princesaSecuestrada = true;
+           System.out.println("DRAGON: Un Dragon Carmesi ha secuestrado a Elisabetha!");
+
+           // Mientras este secuestrada, EL HILO SE CONGELA (wait)
+           while (princesaSecuestrada) {
+               try {
+                   wait();  // Congela el hilo que atiende a Elisabetha
+               } catch (InterruptedException e) {}
+           }
+       }
+
+       // Cuando Lance va a la torre, llama a esto
+       public synchronized boolean rescatar() {
+           if (princesaSecuestrada) {
+               princesaSecuestrada = false;
+               System.out.println("LANCE: Ha matado al Dragon y liberado a Elisabetha!");
+               notifyAll();  // DESPIERTA el hilo congelado de Elisabetha
+               return true;  // Hubo rescate
+           }
+           return false;  // La torre estaba vacia
+       }
+   }
+
+   CLAVE: Esto es el patron PRODUCTOR-CONSUMIDOR / WAIT-NOTIFY que hemos
+   visto en clase. El hilo de Elisabetha queda dormido en wait() hasta que
+   Lance llama a notifyAll() desde rescatar().
+
+--- PASO 2: Actualizar el Servidor para manejar los nuevos codigos ---
+
+   En el hilo que atiende peticiones (HiloTaberna o equivalente), anadir
+   la TorreDelDragon como atributo y dos nuevos codigos de operacion:
+
+   - Codigo 5: Elisabetha es secuestrada
+   - Codigo 6: Lance intenta rescate
+
+   En el constructor del hilo servidor, pasar la TorreDelDragon:
+
+   private TorreDelDragon torre;
+
+   // En el constructor:
+   public HiloPeticion(Socket s, ..., TorreDelDragon torre) {
+       this.torre = torre;
+       // ...
+   }
+
+   // En el run(), dentro del if/else o switch de operaciones:
+   else if (operacion == 5) {
+       // Elisabetha es secuestrada
+       torre.serSecuestrada();  // Este hilo hace wait() y se queda PARADO
+       // Cuando Lance la libere, el hilo despierta y responde:
+       salida.writeInt(1);  // Señal de "ya eres libre"
+   }
+
+   else if (operacion == 6) {
+       // Lance intenta un rescate
+       boolean exito = torre.rescatar();
+       salida.writeBoolean(exito);  // true si rescato, false si torre vacia
+   }
+
+   IMPORTANTE: Tambien hay que actualizar el Main.java del Servidor y el
+   ServidorMaestro para crear el objeto TorreDelDragon y pasarlo al hilo
+   servidor (igual que se hace con ControlTaberna).
+
+--- PASO 3: Actualizar HiloElisabetha.java (Cliente) ---
+
+   Anadir una nueva accion "pasearPorElBosque" a Elisabetha.
+   Cambiar el rango aleatorio de acciones (era 4, ahora 5):
+
+   int accion = (int) (Math.random() * 5);  // 5 acciones posibles
+   switch (accion) {
+       case 0: atenderDamas(); break;
+       case 1: asistirBaile(); break;
+       case 2: leerPergaminos(); break;
+       case 3: escaparseALugar(); break;
+       case 4: pasearPorElBosque(); break;  // NUEVA ACCION
+   }
+
+   Y el nuevo metodo:
+
+   private void pasearPorElBosque() {
+       System.out.println("[ELISABETHA] Sale a dar un paseo por el bosque...");
+       try { Thread.sleep(3000); } catch (InterruptedException e) {}
+
+       if (Math.random() < 0.25) {  // 25% de probabilidad de dragon
+           try {
+               Socket socket = new Socket(HOST, PUERTO_TABERNA);
+               DataOutputStream salida = new DataOutputStream(socket.getOutputStream());
+               DataInputStream entrada = new DataInputStream(socket.getInputStream());
+
+               System.out.println("[ELISABETHA] OH NO! Un Dragon la atrapa!");
+               System.out.println("[ELISABETHA] Encerrada en la torre esperando rescate...");
+
+               salida.writeInt(5);  // Codigo 5: Secuestro
+
+               // --- PAUSA ABSOLUTA ---
+               // Elisabetha se queda BLOQUEADA aqui hasta que Lance envie Codigo 6
+               entrada.readInt();
+
+               System.out.println("[ELISABETHA] Lance la ha rescatado! +30 chispa.");
+               modificarChispa(30);
+
+               socket.close();
+           } catch (Exception e) {
+               System.out.println("[ELISABETHA] El dragon huyo (Fallo de red).");
+           }
+       } else {
+           System.out.println("[ELISABETHA] Un paseo tranquilo por el bosque.");
+       }
+   }
+
+   CLAVE: Cuando Elisabetha envia el codigo 5, el servidor ejecuta
+   torre.serSecuestrada() que hace wait(). Esto significa que el
+   entrada.readInt() de Elisabetha se queda bloqueado hasta que el servidor
+   despierte (cuando Lance envie codigo 6). Es comunicacion BLOQUEANTE
+   a traves de sockets, combinada con wait/notifyAll en el servidor.
+
+--- PASO 4: Actualizar HiloLance.java (Cliente) ---
+
+   Igual que con Elisabetha, anadir una nueva accion "explorarMontanas".
+   Cambiar rango aleatorio a 4 acciones (era 3, ahora 4):
+
+   int accion = (int) (Math.random() * 4);
+   switch (accion) {
+       case 0: hablarConCompaneros(); break;
+       case 1: desafiarADuelo(); break;
+       case 2: realizarGuardia(); break;
+       case 3: explorarMontanas(); break;  // NUEVA ACCION
+   }
+
+   Y el nuevo metodo:
+
+   private void explorarMontanas() {
+       System.out.println("[LANCE] Cabalga hacia las montanas buscando aventuras...");
+       try { Thread.sleep(4000); } catch (InterruptedException e) {}
+
+       try {
+           Socket socket = new Socket(HOST, PUERTO_TABERNA);
+           DataOutputStream salida = new DataOutputStream(socket.getOutputStream());
+           DataInputStream entrada = new DataInputStream(socket.getInputStream());
+
+           salida.writeInt(6);  // Codigo 6: Intento de rescate
+
+           // El servidor responde true si Elisabetha estaba secuestrada
+           boolean princesaRescatada = entrada.readBoolean();
+
+           if (princesaRescatada) {
+               System.out.println("[LANCE] Un Dragon Carmesi! Lucha y lo decapita!");
+               System.out.println("[LANCE] Ha rescatado a la Princesa! +30 chispa.");
+               modificarChispa(30);
+           } else {
+               System.out.println("[LANCE] La torre del dragon esta abandonada.");
+           }
+
+           socket.close();
+       } catch (Exception e) {
+           System.out.println("[LANCE] La montana es inaccesible (Fallo de red).");
+       }
+   }
+
+   CLAVE: Lance envia codigo 6, el servidor ejecuta torre.rescatar() que
+   hace notifyAll() si Elisabetha estaba secuestrada. Esto despierta
+   el hilo del servidor que atendia a Elisabetha, que entonces responde
+   a Elisabetha con writeInt(1) y ella se desbloquea tambien.
+
+--- RESUMEN DEL FLUJO COMPLETO DEL SECUESTRO ---
+
+   1. Elisabetha pasea por el bosque (25% probabilidad de dragon)
+   2. Elisabetha conecta al servidor, envia codigo 5
+   3. Servidor ejecuta torre.serSecuestrada() -> wait() -> HILO CONGELADO
+   4. Elisabetha queda bloqueada en entrada.readInt() (el servidor no responde)
+   5. [Mientras tanto, el tiempo pasa, otros hilos siguen ejecutandose...]
+   6. Lance explora montanas, conecta al servidor, envia codigo 6
+   7. Servidor ejecuta torre.rescatar() -> notifyAll() -> DESPIERTA HILO ELISABETHA
+   8. Hilo de Elisabetha en servidor sale del while, ejecuta salida.writeInt(1)
+   9. Elisabetha (cliente) recibe el readInt() y se desbloquea
+  10. Ambos ganan +30 chispa
+
+   PATRON USADO: Socket bloqueante + Monitor (synchronized/wait/notifyAll)
+   = Exactamente lo que hemos visto en clase combinando ambas tecnicas.
+
+
+================================================================================
 CHECKLIST RAPIDO PARA EL EXAMEN
 ================================================================================
 
