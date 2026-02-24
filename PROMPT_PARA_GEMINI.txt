@@ -1,0 +1,59 @@
+PROMPT PARA GEMINI - COPIAR TODO DESDE AQUI HASTA EL FINAL
+================================================================================
+
+Eres un programador Java experto en sockets y concurrencia básica. Te adjunto un archivo .txt que contiene el proyecto base completo "La Chispa Adecuada" de la asignatura PSP (Programación de Servicios y Procesos). El proyecto simula el Cantar de Roedalia con hilos y sockets.
+
+REGLAS ESTRICTAS QUE DEBES CUMPLIR:
+
+1. USA SOLO estos elementos de Java (son los únicos vistos en clase):
+   - Socket, ServerSocket (java.net)
+   - DataInputStream, DataOutputStream (java.io)
+   - readUTF(), writeUTF(), readInt(), writeInt(), readBoolean(), writeBoolean()
+   - Thread (extends Thread), Runnable (implements Runnable)
+   - synchronized, wait(), notifyAll()
+   - volatile
+   - Random
+   - NO uses BufferedReader, PrintWriter, ObjectInputStream, Serializable, ExecutorService, CompletableFuture, ConcurrentHashMap, Semaphore, CountDownLatch, CyclicBarrier, ReentrantLock, Streams, lambdas ni ninguna clase o estructura que NO aparezca en el proyecto base que te adjunto.
+
+2. ESTRUCTURA DEL CODIGO: Sigue EXACTAMENTE los mismos patrones que ves en el proyecto base:
+   - Servidores: ServidorMaestro arranca hilos con new Thread(Runnable).start()
+   - Cada servidor tiene: HiloServidor_____ (Runnable con ServerSocket + accept en bucle) + Hilo_____ (Thread que atiende a UN cliente con switch de comandos readUTF)
+   - Si hay estado compartido en el servidor: Control_____ (clase con métodos synchronized + wait/notifyAll)
+   - Clientes: ClienteMaestro con variables static compartidas (buzones) protegidas con synchronized(lock) + wait/notifyAll
+   - Los personajes son Threads con bucle while(!simulacionTerminada)
+   - Protocolo de comunicación: siempre con writeUTF("COMANDO") y switch(entrada.readUTF()) en el servidor
+   - Desconexión: siempre enviar "DESCONECTAR" y recibir "ADIOS" antes de cerrar socket
+
+3. FORMATO DE RESPUESTA - MUY IMPORTANTE:
+   - Devuélveme TODO el código en UN SOLO bloque de texto (un solo cuadro de código) para poder copiarlo con un solo click.
+   - Separa cada archivo con esta línea: ================================================================================
+   - El título de cada sección debe ser la RUTA y NOMBRE del archivo, así:
+
+   ================================================================================
+     Servidores/src/NombreArchivo.java
+   ================================================================================
+
+   (código completo del archivo)
+
+   ================================================================================
+     Clientes/src/OtroArchivo.java
+   ================================================================================
+
+   (código completo del archivo)
+
+   - NO uses bloques ```java```. Pon el código directamente como texto plano.
+   - NO me des explicaciones fuera del bloque. Todo dentro del mismo cuadro de texto.
+   - Incluye TODOS los archivos del proyecto, tanto los que se modifican como los que no cambian (para poder copiar y pegar TODO de una vez).
+
+4. COMENTARIOS EN EL CODIGO:
+   - Comenta brevemente cada clase (qué hace y qué patrón usa)
+   - Comenta los métodos principales (qué hacen)
+   - Comenta las líneas clave de synchronized, wait, notifyAll, y las conexiones socket
+
+5. ENUNCIADO DEL EXAMEN QUE DEBO IMPLEMENTAR:
+   [PEGA AQUI EL ENUNCIADO DEL EXAMEN]
+
+6. El proyecto base que te adjunto tiene 14 archivos (8 servidores + 6 clientes). Tu respuesta debe contener TODOS los archivos necesarios para el proyecto final, incluyendo los nuevos y los modificados. Si un archivo no cambia, inclúyelo igualmente tal cual está en el base.
+
+Devuélveme el proyecto completo en un solo bloque de texto copiable.
+

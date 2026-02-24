@@ -1,0 +1,1065 @@
+================================================================================
+  PROYECTO ORIGINAL UNIFICADO COMPLETO - LA CHISPA ADECUADA
+  Todos los archivos para copiar y pegar
+  Cada seccion = 1 archivo Java. El titulo = ruta + nombre del archivo.
+================================================================================
+
+
+================================================================================
+  Servidores/src/ServidorMaestro.java
+================================================================================
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class ServidorMaestro {
+    public static final int PUERTO_TABERNA = 5000;
+    public static final int PUERTO_MERCADO = 5001;
+    public static final int PUERTO_PORTON = 5002;
+
+    public static void main(String[] args) {
+        System.out.println("=== SERVIDORES DE ROEDALIA ===");
+        ControlTaberna controlTaberna = new ControlTaberna();
+        Thread hiloTaberna = new Thread(new HiloServidorTaberna(PUERTO_TABERNA, controlTaberna));
+        hiloTaberna.start();
+        Thread hiloMercado = new Thread(new HiloServidorMercado(PUERTO_MERCADO));
+        hiloMercado.start();
+        Thread hiloPorton = new Thread(new HiloServidorPorton(PUERTO_PORTON));
+        hiloPorton.start();
+        System.out.println("[MAESTRO] Taberna:" + PUERTO_TABERNA + " Mercado:" + PUERTO_MERCADO + " Porton:" + PUERTO_PORTON);
+    }
+}
+
+
+================================================================================
+  Servidores/src/ControlTaberna.java
+================================================================================
+
+public class ControlTaberna {
+    private boolean elisabethaPresente = false;
+    private boolean lancePresente = false;
+    private boolean yaSeConocen = false;
+    private boolean elisabetha100 = false;
+    private boolean lance100 = false;
+
+    public synchronized void entrar(String personaje) {
+        if (personaje.equals("ELISABETHA")) { elisabethaPresente = true; System.out.println("[TABERNA] Elisabetha ha entrado."); }
+        else if (personaje.equals("LANCE")) { lancePresente = true; System.out.println("[TABERNA] Lance ha entrado."); }
+        notifyAll();
+    }
+
+    public synchronized void salir(String personaje) {
+        if (personaje.equals("ELISABETHA")) { elisabethaPresente = false; System.out.println("[TABERNA] Elisabetha ha salido."); }
+        else if (personaje.equals("LANCE")) { lancePresente = false; System.out.println("[TABERNA] Lance ha salido."); }
+        notifyAll();
+    }
+
+    public synchronized boolean estaElisabetha() { return elisabethaPresente; }
+    public synchronized boolean estaLance() { return lancePresente; }
+    public synchronized boolean yaSeConocen() { return yaSeConocen; }
+
+    public synchronized void seConocen() {
+        yaSeConocen = true;
+        System.out.println("[TABERNA] *** LA CHISPA ADECUADA HA NACIDO ***");
+        notifyAll();
+    }
+
+    public synchronized void registrarChispa100(String personaje) {
+        if (personaje.equals("ELISABETHA")) { elisabetha100 = true; System.out.println("[TABERNA] Elisabetha chispa 100!"); }
+        else if (personaje.equals("LANCE")) { lance100 = true; System.out.println("[TABERNA] Lance chispa 100!"); }
+        notifyAll();
+    }
+
+    public synchronized boolean elisabethaChispa100() { return elisabetha100; }
+    public synchronized boolean lanceChispa100() { return lance100; }
+    public synchronized boolean ambosChispa100() { return elisabetha100 && lance100; }
+
+    public synchronized void esperarAlOtro(String personaje) {
+        if (personaje.equals("ELISABETHA")) {
+            while (!lance100) { try { wait(); } catch (InterruptedException e) { } }
+        } else if (personaje.equals("LANCE")) {
+            while (!elisabetha100) { try { wait(); } catch (InterruptedException e) { } }
+        }
+        notifyAll();
+    }
+}
+
+
+================================================================================
+  Servidores/src/HiloServidorTaberna.java
+================================================================================
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class HiloServidorTaberna implements Runnable {
+    private int puerto;
+    private ControlTaberna control;
+
+    public HiloServidorTaberna(int puerto, ControlTaberna control) {
+        this.puerto = puerto;
+        this.control = control;
+    }
+
+    @Override
+    public void run() {
+        try {
+            ServerSocket skServidor = new ServerSocket(puerto);
+            System.out.println("[TABERNA] Servidor en puerto " + puerto);
+            while (true) {
+                Socket skCliente = skServidor.accept();
+                new HiloTaberna(skCliente, control).start();
+            }
+        } catch (IOException e) {
+            System.out.println("[TABERNA] Error: " + e.getMessage());
+        }
+    }
+}
+
+
+================================================================================
+  Servidores/src/HiloTaberna.java
+================================================================================
+
+import java.io.*;
+import java.net.Socket;
+
+public class HiloTaberna extends Thread {
+    private Socket skCliente;
+    private ControlTaberna control;
+
+    public HiloTaberna(Socket skCliente, ControlTaberna control) {
+        this.skCliente = skCliente;
+        this.control = control;
+    }
+
+    @Override
+    public void run() {
+        try {
+            DataInputStream entrada = new DataInputStream(skCliente.getInputStream());
+            DataOutputStream salida = new DataOutputStream(skCliente.getOutputStream());
+            boolean continuar = true;
+            while (continuar) {
+                String comando = entrada.readUTF();
+                switch (comando) {
+                    case "ENTRAR":
+                        String pe = entrada.readUTF();
+                        control.entrar(pe);
+                        salida.writeUTF("OK");
+                        break;
+                    case "SALIR_TABERNA":
+                        String ps = entrada.readUTF();
+                        control.salir(ps);
+                        salida.writeUTF("OK");
+                        break;
+                    case "CONSULTAR_ELISABETHA":
+                        salida.writeBoolean(control.estaElisabetha());
+                        break;
+                    case "CONSULTAR_LANCE":
+                        salida.writeBoolean(control.estaLance());
+                        break;
+                    case "YA_SE_CONOCEN":
+                        salida.writeBoolean(control.yaSeConocen());
+                        break;
+                    case "SE_CONOCEN":
+                        control.seConocen();
+                        salida.writeUTF("CHISPA_GENERADA");
+                        break;
+                    case "REGISTRAR_CHISPA_100":
+                        String p100 = entrada.readUTF();
+                        control.registrarChispa100(p100);
+                        salida.writeUTF("OK");
+                        break;
+                    case "CONSULTAR_CHISPA_100_ELISABETHA":
+                        salida.writeBoolean(control.elisabethaChispa100());
+                        break;
+                    case "CONSULTAR_CHISPA_100_LANCE":
+                        salida.writeBoolean(control.lanceChispa100());
+                        break;
+                    case "CONSULTAR_AMBOS_100":
+                        salida.writeBoolean(control.ambosChispa100());
+                        break;
+                    case "ESPERAR_AL_OTRO":
+                        String pEspera = entrada.readUTF();
+                        control.esperarAlOtro(pEspera);
+                        salida.writeUTF("FINAL_FELIZ");
+                        break;
+                    case "DESCONECTAR":
+                        continuar = false;
+                        salida.writeUTF("ADIOS");
+                        break;
+                    default:
+                        salida.writeUTF("COMANDO_DESCONOCIDO");
+                        break;
+                }
+            }
+            skCliente.close();
+        } catch (IOException e) {
+            System.out.println("[TABERNA] Cliente desconectado.");
+        }
+    }
+}
+
+
+================================================================================
+  Servidores/src/HiloServidorMercado.java
+================================================================================
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class HiloServidorMercado implements Runnable {
+    private int puerto;
+
+    public HiloServidorMercado(int puerto) {
+        this.puerto = puerto;
+    }
+
+    @Override
+    public void run() {
+        try {
+            ServerSocket skServidor = new ServerSocket(puerto);
+            System.out.println("[MERCADO] Servidor en puerto " + puerto);
+            while (true) {
+                Socket skCliente = skServidor.accept();
+                new HiloMercado(skCliente).start();
+            }
+        } catch (IOException e) {
+            System.out.println("[MERCADO] Error: " + e.getMessage());
+        }
+    }
+}
+
+
+================================================================================
+  Servidores/src/HiloMercado.java
+================================================================================
+
+import java.io.*;
+import java.net.Socket;
+import java.util.Random;
+
+public class HiloMercado extends Thread {
+    private Socket skCliente;
+    private static final String[] TODOS_LOS_PRODUCTOS = {
+        "queso", "pan recien horneado", "especias del lejano oriente",
+        "telas para vestidos", "jugo de grosella", "repelente de gatos",
+        "brillantes collares de ratona", "cucharas de boj tamano raton"
+    };
+
+    public HiloMercado(Socket skCliente) {
+        this.skCliente = skCliente;
+    }
+
+    @Override
+    public void run() {
+        try {
+            DataInputStream entrada = new DataInputStream(skCliente.getInputStream());
+            DataOutputStream salida = new DataOutputStream(skCliente.getOutputStream());
+            boolean continuar = true;
+            while (continuar) {
+                String comando = entrada.readUTF();
+                switch (comando) {
+                    case "VISITAR_MERCADO":
+                        String nombre = entrada.readUTF();
+                        System.out.println("[MERCADO] " + nombre + " llega al mercado.");
+                        Random random = new Random();
+                        String[] oferta = new String[5];
+                        boolean[] usados = new boolean[TODOS_LOS_PRODUCTOS.length];
+                        for (int i = 0; i < 5; i++) {
+                            int idx;
+                            do { idx = random.nextInt(TODOS_LOS_PRODUCTOS.length); } while (usados[idx]);
+                            usados[idx] = true;
+                            oferta[i] = TODOS_LOS_PRODUCTOS[idx];
+                        }
+                        salida.writeInt(5);
+                        for (int i = 0; i < 5; i++) { salida.writeUTF(oferta[i]); }
+                        int eleccion = entrada.readInt();
+                        if (eleccion >= 0 && eleccion < 5) {
+                            salida.writeUTF("Gracias por comprar " + oferta[eleccion] + ", " + nombre + "!");
+                        } else {
+                            salida.writeUTF("Eleccion no valida.");
+                        }
+                        break;
+                    case "DESCONECTAR":
+                        continuar = false;
+                        salida.writeUTF("ADIOS");
+                        break;
+                    default:
+                        salida.writeUTF("COMANDO_DESCONOCIDO");
+                        break;
+                }
+            }
+            skCliente.close();
+        } catch (IOException e) {
+            System.out.println("[MERCADO] Cliente desconectado.");
+        }
+    }
+}
+
+
+================================================================================
+  Servidores/src/HiloServidorPorton.java
+================================================================================
+
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class HiloServidorPorton implements Runnable {
+    private int puerto;
+
+    public HiloServidorPorton(int puerto) {
+        this.puerto = puerto;
+    }
+
+    @Override
+    public void run() {
+        try {
+            ServerSocket skServidor = new ServerSocket(puerto);
+            System.out.println("[PORTON] Servidor en puerto " + puerto);
+            while (true) {
+                Socket skCliente = skServidor.accept();
+                new HiloPorton(skCliente).start();
+            }
+        } catch (IOException e) {
+            System.out.println("[PORTON] Error: " + e.getMessage());
+        }
+    }
+}
+
+
+================================================================================
+  Servidores/src/HiloPorton.java
+================================================================================
+
+import java.io.*;
+import java.net.Socket;
+import java.util.Random;
+
+public class HiloPorton extends Thread {
+    private Socket skCliente;
+    private static final String[] RATONES_CIUDAD = {
+        "Raton Mercader Pedro", "Ratona Costurera Maria",
+        "Raton Panadero Juan", "Ratona Herrera Ana"
+    };
+    private static final String[] RATONES_FORANEOS = {
+        "Raton viajero del Norte", "Ratona comerciante del Este",
+        "Raton errante del Sur", "Ratona exploradora del Oeste"
+    };
+    private static final String[] PRODUCTOS_CARRETA = {
+        "queso fermentado", "telas finas", "especias",
+        "herramientas", "queso sin fermentar", "leche cruda",
+        "pan artesano", "frutas secas", "miel"
+    };
+
+    public HiloPorton(Socket skCliente) {
+        this.skCliente = skCliente;
+    }
+
+    @Override
+    public void run() {
+        try {
+            DataInputStream entrada = new DataInputStream(skCliente.getInputStream());
+            DataOutputStream salida = new DataOutputStream(skCliente.getOutputStream());
+            boolean continuar = true;
+            while (continuar) {
+                String comando = entrada.readUTF();
+                switch (comando) {
+                    case "VIGILAR_PORTON":
+                        String guardia = entrada.readUTF();
+                        System.out.println("[PORTON] " + guardia + " comienza turno.");
+                        Random random = new Random();
+                        if (random.nextBoolean()) {
+                            String raton = RATONES_CIUDAD[random.nextInt(RATONES_CIUDAD.length)];
+                            salida.writeUTF("CARRETA_LOCAL");
+                            salida.writeUTF(raton);
+                            salida.writeUTF("Adelante " + raton + ", bienvenido!");
+                        } else {
+                            String raton = RATONES_FORANEOS[random.nextInt(RATONES_FORANEOS.length)];
+                            String producto = PRODUCTOS_CARRETA[random.nextInt(PRODUCTOS_CARRETA.length)];
+                            if (producto.equals("queso sin fermentar") || producto.equals("leche cruda")) {
+                                salida.writeUTF("CARRETA_RECHAZADA");
+                                salida.writeUTF(raton);
+                                salida.writeUTF("No puede entrar con " + producto + ". Acceso denegado.");
+                            } else {
+                                salida.writeUTF("CARRETA_PERMITIDA");
+                                salida.writeUTF(raton);
+                                salida.writeUTF("Puede pasar con " + producto + ". Bienvenido.");
+                            }
+                        }
+                        break;
+                    case "VIGILAR_LUGAR":
+                        String cab = entrada.readUTF();
+                        String lugar = entrada.readUTF();
+                        System.out.println("[PORTON] " + cab + " vigila: " + lugar);
+                        salida.writeUTF("VIGILANCIA_OK");
+                        break;
+                    case "DESCONECTAR":
+                        continuar = false;
+                        salida.writeUTF("ADIOS");
+                        break;
+                    default:
+                        salida.writeUTF("COMANDO_DESCONOCIDO");
+                        break;
+                }
+            }
+            skCliente.close();
+        } catch (IOException e) {
+            System.out.println("[PORTON] Cliente desconectado.");
+        }
+    }
+}
+
+
+================================================================================
+  Clientes/src/ClienteMaestro.java
+================================================================================
+
+public class ClienteMaestro {
+    public static final String HOST = "localhost";
+    public static final int PUERTO_TABERNA = 5000;
+    public static final int PUERTO_MERCADO = 5001;
+    public static final int PUERTO_PORTON = 5002;
+
+    public static final Object lockElisabetha = new Object();
+    public static String damaQuePide = null;
+    public static String mensajeDama = null;
+    public static boolean hayPeticionDama = false;
+    public static boolean hayPeticionAlquimistaE = false;
+    public static String mensajeAlquimistaE = null;
+    public static int chispaElisabetha = 0;
+
+    public static final Object lockLance = new Object();
+    public static String caballeroQuePide = null;
+    public static String mensajeCaballero = null;
+    public static boolean hayPeticionCaballero = false;
+    public static boolean hayPeticionAlquimistaL = false;
+    public static String mensajeAlquimistaL = null;
+    public static String tipoAccionAlquimistaL = null;
+    public static int chispaLance = 0;
+
+    public static volatile boolean simulacionTerminada = false;
+
+    public static void main(String[] args) {
+        System.out.println("=== CLIENTES DE ROEDALIA ===");
+        HiloElisabetha elisabetha = new HiloElisabetha();
+        elisabetha.start();
+        HiloLance lance = new HiloLance();
+        lance.start();
+        for (int i = 0; i < 4; i++) { new HiloDama(i + 1).start(); }
+        for (int i = 0; i < 4; i++) { new HiloCaballero(i + 1).start(); }
+        for (int i = 0; i < 2; i++) { new HiloAlquimista(i + 1).start(); }
+        System.out.println("[MAESTRO] Todos los personajes iniciados!");
+        try { elisabetha.join(); lance.join(); } catch (InterruptedException e) { }
+        simulacionTerminada = true;
+        System.out.println("\n=== FINAL FELIZ - Elisabetha y Lance fueron felices y comieron perdices ===");
+        System.exit(0);
+    }
+}
+
+
+================================================================================
+  Clientes/src/HiloElisabetha.java
+================================================================================
+
+import java.io.*;
+import java.net.Socket;
+import java.util.Random;
+
+public class HiloElisabetha extends Thread {
+    private int nivelChispa = 0;
+    private boolean conoceALance = false;
+    private boolean chispa100 = false;
+    private Random random = new Random();
+
+    @Override
+    public void run() {
+        System.out.println("[ELISABETHA] Comienza. Chispa: " + nivelChispa);
+        while (!ClienteMaestro.simulacionTerminada) {
+            synchronized (ClienteMaestro.lockElisabetha) {
+                if (ClienteMaestro.hayPeticionAlquimistaE) { procesarAlquimista(); }
+            }
+            if (chispa100) { System.out.println("[ELISABETHA] Chispa 100! Espera a Lance..."); esperarLanceEnTaberna(); break; }
+            int accion = random.nextInt(4);
+            switch (accion) {
+                case 0: atenderDamas(); break;
+                case 1: asistirBaile(); break;
+                case 2: leerPergaminos(); break;
+                case 3: escaparseALugar(); break;
+            }
+            synchronized (ClienteMaestro.lockElisabetha) { ClienteMaestro.chispaElisabetha = nivelChispa; }
+            if (nivelChispa >= 100 && conoceALance) { nivelChispa = 100; chispa100 = true; }
+        }
+    }
+
+    private void atenderDamas() {
+        boolean[] intentadas = new boolean[4];
+        boolean atendida = false;
+        for (int intentos = 0; intentos < 4 && !atendida; intentos++) {
+            int d; do { d = random.nextInt(4); } while (intentadas[d]);
+            intentadas[d] = true;
+            String nombreDama = "Dama" + (d + 1);
+            try { Thread.sleep(4000); } catch (InterruptedException e) { }
+            synchronized (ClienteMaestro.lockElisabetha) {
+                if (ClienteMaestro.hayPeticionDama && ClienteMaestro.damaQuePide != null
+                        && ClienteMaestro.damaQuePide.equals(nombreDama)) {
+                    String mensaje = ClienteMaestro.mensajeDama;
+                    ClienteMaestro.hayPeticionDama = false;
+                    ClienteMaestro.damaQuePide = null;
+                    ClienteMaestro.mensajeDama = null;
+                    ClienteMaestro.lockElisabetha.notifyAll();
+                    if (mensaje != null && mensaje.equals("RUMOR_LANCE")) {
+                        if (!chispa100) { nivelChispa = Math.max(0, nivelChispa - 5); }
+                        System.out.println("[ELISABETHA] Rumor sobre Lance. Chispa: " + nivelChispa);
+                    } else if (mensaje != null && mensaje.equals("INVITACION_BAILE")) {
+                        if (random.nextInt(100) < 20) { asistirBaile(); }
+                        else { System.out.println("[ELISABETHA] Esquiva invitacion al baile."); }
+                    } else {
+                        System.out.println("[ELISABETHA] Confidencia. Sin efecto.");
+                    }
+                    atendida = true;
+                }
+            }
+        }
+    }
+
+    private void asistirBaile() {
+        System.out.println("[ELISABETHA] Asiste a un baile...");
+        try { Thread.sleep(5000); } catch (InterruptedException e) { }
+        if (!chispa100) { nivelChispa = Math.max(0, nivelChispa - 5); }
+        System.out.println("[ELISABETHA] Baile aburrido. Chispa: " + nivelChispa);
+    }
+
+    private void leerPergaminos() {
+        System.out.println("[ELISABETHA] Lee pergaminos...");
+        try { Thread.sleep(5000); } catch (InterruptedException e) { }
+        if (chispa100) return;
+        if (random.nextBoolean()) {
+            nivelChispa = Math.max(0, nivelChispa - 7);
+            System.out.println("[ELISABETHA] Pergaminos soporiferos. Chispa: " + nivelChispa);
+        } else {
+            if (conoceALance) { nivelChispa += 5; }
+            else { nivelChispa = Math.min(30, nivelChispa + 5); }
+            System.out.println("[ELISABETHA] Leyendas heroicas. Chispa: " + nivelChispa);
+        }
+    }
+
+    private void escaparseALugar() {
+        if (random.nextBoolean()) { visitarMercado(); } else { visitarTaberna(); }
+    }
+
+    private void visitarMercado() {
+        System.out.println("[ELISABETHA] Va al Mercado...");
+        try {
+            Socket sk = new Socket(ClienteMaestro.HOST, ClienteMaestro.PUERTO_MERCADO);
+            DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
+            DataInputStream ent = new DataInputStream(sk.getInputStream());
+            sal.writeUTF("VISITAR_MERCADO"); sal.writeUTF("Elisabetha");
+            int n = ent.readInt();
+            String[] p = new String[n];
+            for (int i = 0; i < n; i++) { p[i] = ent.readUTF(); }
+            int eleccion = random.nextInt(n);
+            sal.writeInt(eleccion);
+            String resp = ent.readUTF();
+            System.out.println("[ELISABETHA] Compra: " + p[eleccion] + ". " + resp);
+            sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
+            try { Thread.sleep(5000); } catch (InterruptedException e) { }
+        } catch (IOException e) { System.out.println("[ELISABETHA] No pudo ir al mercado."); }
+    }
+
+    private void visitarTaberna() {
+        System.out.println("[ELISABETHA] Va a la Taberna...");
+        try {
+            Socket sk = new Socket(ClienteMaestro.HOST, ClienteMaestro.PUERTO_TABERNA);
+            DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
+            DataInputStream ent = new DataInputStream(sk.getInputStream());
+            sal.writeUTF("ENTRAR"); sal.writeUTF("ELISABETHA"); ent.readUTF();
+            sal.writeUTF("CONSULTAR_LANCE"); boolean lanceEsta = ent.readBoolean();
+            long t0 = System.currentTimeMillis();
+            if (lanceEsta) { encuentroConLance(sal, ent); }
+            else {
+                while (System.currentTimeMillis() - t0 < 5000) {
+                    try { Thread.sleep(1000); } catch (InterruptedException e) { }
+                    sal.writeUTF("CONSULTAR_LANCE"); lanceEsta = ent.readBoolean();
+                    if (lanceEsta) { encuentroConLance(sal, ent); break; }
+                }
+                if (!lanceEsta) { System.out.println("[ELISABETHA] Lance no aparecio. Chispa: " + nivelChispa); }
+            }
+            sal.writeUTF("SALIR_TABERNA"); sal.writeUTF("ELISABETHA"); ent.readUTF();
+            sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
+        } catch (IOException e) { System.out.println("[ELISABETHA] No pudo ir a la taberna."); }
+    }
+
+    private void encuentroConLance(DataOutputStream sal, DataInputStream ent) throws IOException {
+        sal.writeUTF("YA_SE_CONOCEN"); boolean ya = ent.readBoolean();
+        if (!ya) {
+            sal.writeUTF("SE_CONOCEN"); ent.readUTF();
+            nivelChispa = 75; conoceALance = true;
+            System.out.println("[ELISABETHA] *** LA CHISPA HA NACIDO *** Chispa: 75");
+        } else if (!conoceALance) {
+            nivelChispa = 75; conoceALance = true;
+            System.out.println("[ELISABETHA] *** LA CHISPA HA NACIDO *** Chispa: 75");
+        } else {
+            nivelChispa += 10;
+            System.out.println("[ELISABETHA] Reencuentro con Lance. Chispa: " + nivelChispa);
+        }
+    }
+
+    private void esperarLanceEnTaberna() {
+        try {
+            Socket sk = new Socket(ClienteMaestro.HOST, ClienteMaestro.PUERTO_TABERNA);
+            DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
+            DataInputStream ent = new DataInputStream(sk.getInputStream());
+            sal.writeUTF("REGISTRAR_CHISPA_100"); sal.writeUTF("ELISABETHA"); ent.readUTF();
+            sal.writeUTF("ESPERAR_AL_OTRO"); sal.writeUTF("ELISABETHA");
+            String res = ent.readUTF();
+            if (res.equals("FINAL_FELIZ")) { System.out.println("[ELISABETHA] *** FINAL FELIZ ***"); }
+            sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
+        } catch (IOException e) { System.out.println("[ELISABETHA] Error esperando a Lance."); }
+    }
+
+    private void procesarAlquimista() {
+        if (ClienteMaestro.mensajeAlquimistaE != null && ClienteMaestro.mensajeAlquimistaE.equals("POCION")) {
+            if (random.nextInt(100) < 30) {
+                if (!chispa100) { nivelChispa = Math.max(0, nivelChispa - 20); }
+                System.out.println("[ELISABETHA] Alquimista la engano! Chispa: " + nivelChispa);
+            } else { System.out.println("[ELISABETHA] No se deja enganar."); }
+        }
+        ClienteMaestro.hayPeticionAlquimistaE = false;
+        ClienteMaestro.mensajeAlquimistaE = null;
+        ClienteMaestro.lockElisabetha.notifyAll();
+    }
+}
+
+
+================================================================================
+  Clientes/src/HiloLance.java
+================================================================================
+
+import java.io.*;
+import java.net.Socket;
+import java.util.Random;
+
+public class HiloLance extends Thread {
+    private int nivelChispa = 0;
+    private boolean conoceAElisabetha = false;
+    private boolean chispa100 = false;
+    private Random random = new Random();
+
+    @Override
+    public void run() {
+        System.out.println("[LANCE] Comienza. Chispa: " + nivelChispa);
+        while (!ClienteMaestro.simulacionTerminada) {
+            synchronized (ClienteMaestro.lockLance) {
+                if (ClienteMaestro.hayPeticionAlquimistaL) { procesarAlquimista(); }
+            }
+            if (chispa100) { System.out.println("[LANCE] Chispa 100! Espera a Elisabetha..."); esperarElisabethaEnTaberna(); break; }
+            int accion = random.nextInt(3);
+            switch (accion) {
+                case 0: hablarConCompaneros(); break;
+                case 1: desafiarDuelo(); break;
+                case 2: realizarGuardia(); break;
+            }
+            synchronized (ClienteMaestro.lockLance) { ClienteMaestro.chispaLance = nivelChispa; }
+            if (nivelChispa >= 100 && conoceAElisabetha) { nivelChispa = 100; chispa100 = true; }
+        }
+    }
+
+    private void hablarConCompaneros() {
+        boolean[] intentados = new boolean[4];
+        boolean atendido = false;
+        for (int intentos = 0; intentos < 4 && !atendido; intentos++) {
+            int c; do { c = random.nextInt(4); } while (intentados[c]);
+            intentados[c] = true;
+            String nombreCab = "Caballero" + (c + 1);
+            try { Thread.sleep(4000); } catch (InterruptedException e) { }
+            synchronized (ClienteMaestro.lockLance) {
+                if (ClienteMaestro.hayPeticionCaballero && ClienteMaestro.caballeroQuePide != null
+                        && ClienteMaestro.caballeroQuePide.equals(nombreCab)) {
+                    String mensaje = ClienteMaestro.mensajeCaballero;
+                    ClienteMaestro.hayPeticionCaballero = false;
+                    ClienteMaestro.caballeroQuePide = null;
+                    ClienteMaestro.mensajeCaballero = null;
+                    ClienteMaestro.lockLance.notifyAll();
+                    if (mensaje != null && mensaje.equals("OFENSA_ELISABETHA")) {
+                        System.out.println("[LANCE] " + nombreCab + " ofende a Elisabetha! Duelo!");
+                        realizarDueloConCompanero(nombreCab);
+                    } else {
+                        System.out.println("[LANCE] " + nombreCab + " cuenta confidencia. Sin efecto.");
+                    }
+                    atendido = true;
+                }
+            }
+        }
+    }
+
+    private void desafiarDuelo() {
+        synchronized (ClienteMaestro.lockLance) {
+            if (ClienteMaestro.hayPeticionCaballero && ClienteMaestro.mensajeCaballero != null
+                    && ClienteMaestro.mensajeCaballero.equals("OFENSA_ELISABETHA")) {
+                String nombreCab = ClienteMaestro.caballeroQuePide;
+                ClienteMaestro.hayPeticionCaballero = false;
+                ClienteMaestro.caballeroQuePide = null;
+                ClienteMaestro.mensajeCaballero = null;
+                ClienteMaestro.lockLance.notifyAll();
+                realizarDueloConCompanero(nombreCab);
+                return;
+            }
+        }
+        System.out.println("[LANCE] No hay ofensas. Entrena con su espada.");
+        try { Thread.sleep(3000); } catch (InterruptedException e) { }
+    }
+
+    private void realizarDueloConCompanero(String nombreCab) {
+        System.out.println("[LANCE] Duelo con " + nombreCab + "!");
+        try { Thread.sleep(5000); } catch (InterruptedException e) { }
+        if (random.nextInt(100) < 20) {
+            if (!chispa100) { nivelChispa = Math.max(0, nivelChispa - 5); }
+            System.out.println("[LANCE] Vence pero dana a " + nombreCab + ". Chispa: " + nivelChispa);
+        } else {
+            if (conoceAElisabetha) { nivelChispa += 7; }
+            else { nivelChispa = Math.min(50, nivelChispa + 7); }
+            System.out.println("[LANCE] Vence sin dano. Chispa: " + nivelChispa);
+        }
+    }
+
+    private void realizarGuardia() {
+        if (random.nextBoolean()) { vigilarPorton(); } else { vigilarTaberna(); }
+    }
+
+    private void vigilarPorton() {
+        System.out.println("[LANCE] Vigila el Porton Norte...");
+        try {
+            Socket sk = new Socket(ClienteMaestro.HOST, ClienteMaestro.PUERTO_PORTON);
+            DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
+            DataInputStream ent = new DataInputStream(sk.getInputStream());
+            sal.writeUTF("VIGILAR_PORTON"); sal.writeUTF("Lance");
+            String tipo = ent.readUTF(); String raton = ent.readUTF(); String msg = ent.readUTF();
+            System.out.println("[LANCE] " + tipo + " - " + raton + ". " + msg);
+            sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
+            try { Thread.sleep(5000); } catch (InterruptedException e) { }
+        } catch (IOException e) { System.out.println("[LANCE] No pudo ir al Porton."); }
+    }
+
+    private void vigilarTaberna() {
+        System.out.println("[LANCE] Vigila la Taberna...");
+        try {
+            Socket sk = new Socket(ClienteMaestro.HOST, ClienteMaestro.PUERTO_TABERNA);
+            DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
+            DataInputStream ent = new DataInputStream(sk.getInputStream());
+            sal.writeUTF("ENTRAR"); sal.writeUTF("LANCE"); ent.readUTF();
+            sal.writeUTF("CONSULTAR_ELISABETHA"); boolean esta = ent.readBoolean();
+            long t0 = System.currentTimeMillis();
+            if (esta) { encuentroConElisabetha(sal, ent); }
+            else {
+                while (System.currentTimeMillis() - t0 < 8000) {
+                    try { Thread.sleep(1000); } catch (InterruptedException e) { }
+                    sal.writeUTF("CONSULTAR_ELISABETHA"); esta = ent.readBoolean();
+                    if (esta) { encuentroConElisabetha(sal, ent); break; }
+                }
+                if (!esta) { System.out.println("[LANCE] Elisabetha no aparecio. Chispa: " + nivelChispa); }
+            }
+            sal.writeUTF("SALIR_TABERNA"); sal.writeUTF("LANCE"); ent.readUTF();
+            sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
+        } catch (IOException e) { System.out.println("[LANCE] No pudo ir a la taberna."); }
+    }
+
+    private void encuentroConElisabetha(DataOutputStream sal, DataInputStream ent) throws IOException {
+        sal.writeUTF("YA_SE_CONOCEN"); boolean ya = ent.readBoolean();
+        if (!ya) {
+            sal.writeUTF("SE_CONOCEN"); ent.readUTF();
+            nivelChispa = 75; conoceAElisabetha = true;
+            System.out.println("[LANCE] *** LA CHISPA HA NACIDO *** Chispa: 75");
+        } else if (!conoceAElisabetha) {
+            nivelChispa = 75; conoceAElisabetha = true;
+            System.out.println("[LANCE] *** LA CHISPA HA NACIDO *** Chispa: 75");
+        } else {
+            nivelChispa += 10;
+            System.out.println("[LANCE] Reencuentro con Elisabetha. Chispa: " + nivelChispa);
+        }
+    }
+
+    private void esperarElisabethaEnTaberna() {
+        try {
+            Socket sk = new Socket(ClienteMaestro.HOST, ClienteMaestro.PUERTO_TABERNA);
+            DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
+            DataInputStream ent = new DataInputStream(sk.getInputStream());
+            sal.writeUTF("REGISTRAR_CHISPA_100"); sal.writeUTF("LANCE"); ent.readUTF();
+            sal.writeUTF("ESPERAR_AL_OTRO"); sal.writeUTF("LANCE");
+            String res = ent.readUTF();
+            if (res.equals("FINAL_FELIZ")) { System.out.println("[LANCE] *** FINAL FELIZ ***"); }
+            sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
+        } catch (IOException e) { System.out.println("[LANCE] Error esperando a Elisabetha."); }
+    }
+
+    private void procesarAlquimista() {
+        if (ClienteMaestro.tipoAccionAlquimistaL != null && ClienteMaestro.tipoAccionAlquimistaL.equals("POCION")) {
+            if (random.nextInt(100) < 20) {
+                if (!chispa100) { nivelChispa = Math.max(0, nivelChispa - 20); }
+                System.out.println("[LANCE] Alquimista lo engano con pocion! Chispa: " + nivelChispa);
+            } else { System.out.println("[LANCE] No se deja enganar."); }
+        } else if (ClienteMaestro.tipoAccionAlquimistaL != null && ClienteMaestro.tipoAccionAlquimistaL.equals("AMENAZA")) {
+            if (random.nextInt(100) < 20) {
+                if (!chispa100) { nivelChispa = Math.max(0, nivelChispa - 30); }
+                System.out.println("[LANCE] Amenaza del Frente Norte afecta! Chispa: " + nivelChispa);
+            } else { System.out.println("[LANCE] No se deja amedrentar."); }
+        }
+        ClienteMaestro.hayPeticionAlquimistaL = false;
+        ClienteMaestro.mensajeAlquimistaL = null;
+        ClienteMaestro.tipoAccionAlquimistaL = null;
+        ClienteMaestro.lockLance.notifyAll();
+    }
+}
+
+
+================================================================================
+  Clientes/src/HiloDama.java
+================================================================================
+
+import java.util.Random;
+
+public class HiloDama extends Thread {
+    private int numeroDama;
+    private String nombreDama;
+    private Random random = new Random();
+
+    public HiloDama(int numero) {
+        this.numeroDama = numero;
+        this.nombreDama = "Dama" + numero;
+    }
+
+    @Override
+    public void run() {
+        while (!ClienteMaestro.simulacionTerminada) {
+            int accion = random.nextInt(2);
+            if (accion == 0) { realizarLabores(); }
+            else { confesarAElisabetha(); }
+        }
+    }
+
+    private void realizarLabores() {
+        String[] labores = {"montar a caballo", "practicar esgrima", "enterarse de rumores"};
+        String labor = labores[random.nextInt(labores.length)];
+        System.out.println("[" + nombreDama + "] Labor: " + labor);
+        try { Thread.sleep(5000); } catch (InterruptedException e) { }
+    }
+
+    private void confesarAElisabetha() {
+        String mensaje;
+        if (random.nextBoolean()) { mensaje = "CONFIDENCIA"; }
+        else { if (random.nextBoolean()) { mensaje = "RUMOR_LANCE"; } else { mensaje = "INVITACION_BAILE"; } }
+
+        synchronized (ClienteMaestro.lockElisabetha) {
+            long inicio = System.currentTimeMillis();
+            ClienteMaestro.damaQuePide = nombreDama;
+            ClienteMaestro.mensajeDama = mensaje;
+            ClienteMaestro.hayPeticionDama = true;
+            while (System.currentTimeMillis() - inicio < 20000 && ClienteMaestro.hayPeticionDama) {
+                try { ClienteMaestro.lockElisabetha.wait(2000); } catch (InterruptedException e) { }
+            }
+            boolean atendida = !ClienteMaestro.hayPeticionDama;
+            if (!atendida) {
+                ClienteMaestro.hayPeticionDama = false;
+                ClienteMaestro.damaQuePide = null;
+                ClienteMaestro.mensajeDama = null;
+            }
+        }
+    }
+}
+
+
+================================================================================
+  Clientes/src/HiloCaballero.java
+================================================================================
+
+import java.io.*;
+import java.net.Socket;
+import java.util.Random;
+
+public class HiloCaballero extends Thread {
+    private int numeroCab;
+    private String nombreCab;
+    private Random random = new Random();
+    private boolean herido = false;
+    private long tiempoHerida = 0;
+
+    public HiloCaballero(int numero) {
+        this.numeroCab = numero;
+        this.nombreCab = "Caballero" + numero;
+    }
+
+    @Override
+    public void run() {
+        while (!ClienteMaestro.simulacionTerminada) {
+            if (herido) {
+                if (System.currentTimeMillis() - tiempoHerida < 30000) {
+                    try { Thread.sleep(5000); } catch (InterruptedException e) { }
+                    continue;
+                } else { herido = false; }
+            }
+            int accion = random.nextInt(2);
+            if (accion == 0) { realizarVigilancia(); }
+            else { hablarConLance(); }
+        }
+    }
+
+    private void realizarVigilancia() {
+        String[] lugares = {"Porton Norte", "muralla", "torres"};
+        String lugar = lugares[random.nextInt(lugares.length)];
+        if (lugar.equals("Porton Norte")) {
+            try {
+                Socket sk = new Socket(ClienteMaestro.HOST, ClienteMaestro.PUERTO_PORTON);
+                DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
+                DataInputStream ent = new DataInputStream(sk.getInputStream());
+                sal.writeUTF("VIGILAR_LUGAR"); sal.writeUTF(nombreCab); sal.writeUTF(lugar);
+                ent.readUTF();
+                sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
+            } catch (IOException e) { }
+        }
+        try { Thread.sleep(6000); } catch (InterruptedException e) { }
+    }
+
+    private void hablarConLance() {
+        String mensaje;
+        if (random.nextInt(100) < 25) { mensaje = "OFENSA_ELISABETHA"; }
+        else { mensaje = "CONFIDENCIA"; }
+
+        synchronized (ClienteMaestro.lockLance) {
+            long inicio = System.currentTimeMillis();
+            ClienteMaestro.caballeroQuePide = nombreCab;
+            ClienteMaestro.mensajeCaballero = mensaje;
+            ClienteMaestro.hayPeticionCaballero = true;
+            while (System.currentTimeMillis() - inicio < 25000 && ClienteMaestro.hayPeticionCaballero) {
+                try { ClienteMaestro.lockLance.wait(2000); } catch (InterruptedException e) { }
+            }
+            boolean atendido = !ClienteMaestro.hayPeticionCaballero;
+            if (!atendido) {
+                ClienteMaestro.hayPeticionCaballero = false;
+                ClienteMaestro.caballeroQuePide = null;
+                ClienteMaestro.mensajeCaballero = null;
+            } else {
+                if (mensaje.equals("OFENSA_ELISABETHA")) {
+                    if (random.nextInt(100) < 20) {
+                        herido = true;
+                        tiempoHerida = System.currentTimeMillis();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+================================================================================
+  Clientes/src/HiloAlquimista.java
+================================================================================
+
+import java.util.Random;
+
+public class HiloAlquimista extends Thread {
+    private int numeroAlq;
+    private String nombreAlq;
+    private Random random = new Random();
+    private int pocionesElisabetha = 0;
+    private int pocionesLance = 0;
+
+    public HiloAlquimista(int numero) {
+        this.numeroAlq = numero;
+        this.nombreAlq = "Alquimista" + numero;
+    }
+
+    @Override
+    public void run() {
+        estudiarCalderos();
+        while (!ClienteMaestro.simulacionTerminada) {
+            int accion = random.nextInt(100);
+            if (accion < 60) { estudiarCalderos(); }
+            else if (accion < 80) { visitarElisabetha(); }
+            else { visitarLance(); }
+        }
+    }
+
+    private void estudiarCalderos() {
+        System.out.println("[" + nombreAlq + "] Estudia calderos...");
+        try { Thread.sleep(30000); } catch (InterruptedException e) { }
+        int r = random.nextInt(100);
+        if (r < 30) { pocionesElisabetha++; System.out.println("[" + nombreAlq + "] Pocion para E! E=" + pocionesElisabetha + " L=" + pocionesLance); }
+        else if (r < 60) { pocionesLance++; System.out.println("[" + nombreAlq + "] Pocion para L! E=" + pocionesElisabetha + " L=" + pocionesLance); }
+        else { System.out.println("[" + nombreAlq + "] Fracasa!"); }
+    }
+
+    private void visitarElisabetha() {
+        if (pocionesElisabetha <= 0) { System.out.println("[" + nombreAlq + "] Sin pociones para E. Se lamenta!"); try { Thread.sleep(3000); } catch (InterruptedException e) { } return; }
+        System.out.println("[" + nombreAlq + "] Visita a Elisabetha...");
+        try { Thread.sleep(5000); } catch (InterruptedException e) { }
+        synchronized (ClienteMaestro.lockElisabetha) {
+            ClienteMaestro.hayPeticionAlquimistaE = true;
+            ClienteMaestro.mensajeAlquimistaE = "POCION";
+            long inicio = System.currentTimeMillis();
+            while (ClienteMaestro.hayPeticionAlquimistaE && System.currentTimeMillis() - inicio < 10000) {
+                try { ClienteMaestro.lockElisabetha.wait(2000); } catch (InterruptedException e) { }
+            }
+            pocionesElisabetha--;
+            if (ClienteMaestro.hayPeticionAlquimistaE) {
+                ClienteMaestro.hayPeticionAlquimistaE = false;
+                ClienteMaestro.mensajeAlquimistaE = null;
+            }
+        }
+    }
+
+    private void visitarLance() {
+        int tipo = random.nextInt(100);
+        if (tipo < 80) {
+            if (pocionesLance <= 0) { System.out.println("[" + nombreAlq + "] Sin pociones para L. Se lamenta!"); try { Thread.sleep(3000); } catch (InterruptedException e) { } return; }
+            System.out.println("[" + nombreAlq + "] Visita a Lance con pocion...");
+            try { Thread.sleep(7000); } catch (InterruptedException e) { }
+            synchronized (ClienteMaestro.lockLance) {
+                ClienteMaestro.hayPeticionAlquimistaL = true;
+                ClienteMaestro.tipoAccionAlquimistaL = "POCION";
+                ClienteMaestro.mensajeAlquimistaL = "POCION";
+                long inicio = System.currentTimeMillis();
+                while (ClienteMaestro.hayPeticionAlquimistaL && System.currentTimeMillis() - inicio < 15000) {
+                    try { ClienteMaestro.lockLance.wait(2000); } catch (InterruptedException e) { }
+                }
+                pocionesLance--;
+                if (ClienteMaestro.hayPeticionAlquimistaL) {
+                    ClienteMaestro.hayPeticionAlquimistaL = false;
+                    ClienteMaestro.mensajeAlquimistaL = null;
+                    ClienteMaestro.tipoAccionAlquimistaL = null;
+                }
+            }
+        } else {
+            System.out.println("[" + nombreAlq + "] Amenaza a Lance con Frente Norte...");
+            try { Thread.sleep(7000); } catch (InterruptedException e) { }
+            synchronized (ClienteMaestro.lockLance) {
+                ClienteMaestro.hayPeticionAlquimistaL = true;
+                ClienteMaestro.tipoAccionAlquimistaL = "AMENAZA";
+                ClienteMaestro.mensajeAlquimistaL = "AMENAZA";
+                long inicio = System.currentTimeMillis();
+                while (ClienteMaestro.hayPeticionAlquimistaL && System.currentTimeMillis() - inicio < 15000) {
+                    try { ClienteMaestro.lockLance.wait(2000); } catch (InterruptedException e) { }
+                }
+                if (ClienteMaestro.hayPeticionAlquimistaL) {
+                    ClienteMaestro.hayPeticionAlquimistaL = false;
+                    ClienteMaestro.mensajeAlquimistaL = null;
+                    ClienteMaestro.tipoAccionAlquimistaL = null;
+                }
+            }
+        }
+    }
+}
+
+
+================================================================================
+  FIN DEL PROYECTO - 14 archivos en total
+  Servidores/src/: ServidorMaestro, ControlTaberna, HiloServidorTaberna,
+                   HiloTaberna, HiloServidorMercado, HiloMercado,
+                   HiloServidorPorton, HiloPorton
+  Clientes/src/:   ClienteMaestro, HiloElisabetha, HiloLance,
+                   HiloDama, HiloCaballero, HiloAlquimista
+================================================================================
+
