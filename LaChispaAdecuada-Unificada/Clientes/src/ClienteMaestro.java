@@ -40,7 +40,7 @@ public static int chispaElisabetha = 0;            // Copia de la chispa para qu
 
     public static void main(String[] args) {
         System.out.println("==============================================");
-        System.out.println("  CLIENTES DE ROEDALIA - MAESTRO");
+        System.out.println("CLIENTES DE ROEDALIA - MAESTRO");
         System.out.println("==============================================");
         System.out.println("[MAESTRO] Iniciando todos los personajes...\n");
 
