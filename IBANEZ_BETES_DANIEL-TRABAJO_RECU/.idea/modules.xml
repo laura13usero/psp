@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/IBANEZ_BETES_DANIEL/Clientes/Clientes.iml" filepath="$PROJECT_DIR$/IBANEZ_BETES_DANIEL/Clientes/Clientes.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/IBANEZ_BETES_DANIEL-TRABAJO_RECU.iml" filepath="$PROJECT_DIR$/.idea/IBANEZ_BETES_DANIEL-TRABAJO_RECU.iml" />
+      <module fileurl="file://$PROJECT_DIR$/IBANEZ_BETES_DANIEL/Servidores/Servidores.iml" filepath="$PROJECT_DIR$/IBANEZ_BETES_DANIEL/Servidores/Servidores.iml" />
+    </modules>
+  </component>
+</project>
