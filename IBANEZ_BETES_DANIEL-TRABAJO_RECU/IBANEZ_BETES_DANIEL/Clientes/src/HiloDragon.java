@@ -23,8 +23,8 @@ public class HiloDragon extends Thread {
                 System.out.println("");
                 System.out.println("============================================================");
                 System.out.println("  *** EL DRAGON DE CENIZA CARMESI HA DESPERTADO ***");
-                System.out.println("  Un rugido ensordecedor recorre las tierras de Roedalia!");
-                System.out.println("  El cielo se tine de rojo y las montanas tiemblan!");
+                System.out.println("  ¡Un rugido ensordecedor recorre las tierras de Roedalia!");
+                System.out.println("   ¡El cielo se torna color rojo y las montanas tiemblan");
                 System.out.println("============================================================");
                 System.out.println("");
 

@@ -4,8 +4,12 @@ public class ControlTaberna {
     private boolean yaSeConocen = false;
     private boolean elisabetha100 = false;
     private boolean lance100 = false;
+    private boolean tabernaDestruida = false;
 
     public synchronized void entrar(String p) {
+        if (tabernaDestruida) {
+            return;
+        }
         if (p.equals("ELISABETHA")) { elisabethaPresente = true; }
         else if (p.equals("LANCE")) { lancePresente = true; }
         System.out.println("[TABERNA] " + p + " ha entrado.");
@@ -35,23 +39,35 @@ public class ControlTaberna {
         notifyAll();
     }
 
-
-
-    public synchronized void esperarAlOtro(String p) {
+    public synchronized boolean esperarAlOtro(String p) {
         if (p.equals("ELISABETHA")) {
             System.out.println("[TABERNA] Elisabetha espera a Lance)...");
-            // MODIFICADO: 3 condiciones
-            while (!lance100) {
+            while (!lance100 && !tabernaDestruida) {
                 try { wait(); } catch (InterruptedException e) { }
             }
         } else if (p.equals("LANCE")) {
             System.out.println("[TABERNA] Lance espera a Elisabetha)...");
-            while (!elisabetha100) {
+            while (!elisabetha100 && !tabernaDestruida) {
                 try { wait(); } catch (InterruptedException e) { }
             }
         }
+        if (tabernaDestruida) {
+            return false;
+        }
         System.out.println("[TABERNA] *** REENCUENTRO: Chispa al 100!!!! ***");
+        notifyAll();
+        return true;
+    }
+
+    public synchronized void marcarDestruidaYExpulsar() {
+        tabernaDestruida = true;
+        elisabethaPresente = false;
+        lancePresente = false;
+        notifyAll();
+    }
+
+    public synchronized void marcarReconstruida() {
+        tabernaDestruida = false;
         notifyAll();
     }
 }
-

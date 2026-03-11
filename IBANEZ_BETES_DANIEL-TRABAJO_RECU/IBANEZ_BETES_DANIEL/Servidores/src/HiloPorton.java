@@ -1,5 +1,8 @@
 import java.io.*;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 
 public class HiloPorton extends Thread {
@@ -8,23 +11,30 @@ public class HiloPorton extends Thread {
     private static final String[] R_FORA = {"Raton del Norte","Ratona del Este","Raton del Sur","Ratona del Oeste"};
     private static final String[] PROD = {"queso fermentado","telas finas","especias","herramientas","queso sin fermentar","leche cruda","pan artesano","frutas secas","miel"};
 
-    // NUEVO: flag volatile de destruccion
     public static volatile boolean destruido = false;
+    private static final List<Socket> clientesActivos = Collections.synchronizedList(new ArrayList<Socket>());
 
     public HiloPorton(Socket sk) { this.skCliente = sk; }
 
     @Override
     public void run() {
+        clientesActivos.add(skCliente);
         try {
             DataInputStream ent = new DataInputStream(skCliente.getInputStream());
             DataOutputStream sal = new DataOutputStream(skCliente.getOutputStream());
             boolean c = true;
             while (c) {
                 String cmd = ent.readUTF();
+
+                if (destruido && !"ATAQUE_DRAGON".equals(cmd) && !"DESCONECTAR".equals(cmd)) {
+                    sal.writeUTF("LUGAR_DESTRUIDO");
+                    c = false;
+                    break;
+                }
+
                 switch (cmd) {
                     case "VIGILAR_PORTON":
                         String g = ent.readUTF();
-                        // NUEVO: comprobar si destruido
                         if (destruido) {
                             sal.writeUTF("LUGAR_DESTRUIDO");
                             sal.writeUTF(g);
@@ -47,27 +57,44 @@ public class HiloPorton extends Thread {
                         break;
                     case "VIGILAR_LUGAR": ent.readUTF(); ent.readUTF(); sal.writeUTF("OK"); break;
 
-                    // NUEVO: Dragon ataca el porton
                     case "ATAQUE_DRAGON":
-                        destruido = true;
-                        System.out.println("[PORTON] *** DRAGON ATACA EL PORTON! En llamas! ***");
+                        if (!destruido) {
+                            destruido = true;
+                            System.out.println("[PORTON] *** DRAGON ATACA EL PORTON! Reducido a cenizas! ***");
+                            expulsarClientesActivos(skCliente);
+                            new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try { Thread.sleep(20000); } catch (InterruptedException e) { }
+                                    destruido = false;
+                                    System.out.println("[PORTON] Porton reconstruido y operativo.");
+                                }
+                            }).start();
+                        }
                         sal.writeUTF("LUGAR_DESTRUIDO");
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                try { Thread.sleep(20000); } catch (InterruptedException e) { }
-                                destruido = false;
-                                System.out.println("[PORTON] Porton reconstruido.");
-                            }
-                        }).start();
                         break;
 
                     case "DESCONECTAR": c=false; sal.writeUTF("ADIOS"); break;
                     default: sal.writeUTF("?"); break;
                 }
             }
-            skCliente.close();
         } catch (IOException e) { System.out.println("[PORTON] Desconexion"); }
+        finally {
+            clientesActivos.remove(skCliente);
+            try { skCliente.close(); } catch (IOException e) { }
+        }
+    }
+
+    private static void expulsarClientesActivos(Socket atacante) {
+        List<Socket> copia;
+        synchronized (clientesActivos) {
+            copia = new ArrayList<Socket>(clientesActivos);
+        }
+        for (Socket s : copia) {
+            if (s == atacante || s.isClosed()) {
+                continue;
+            }
+            try { s.close(); } catch (IOException e) { }
+        }
     }
 }
-

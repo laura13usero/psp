@@ -71,7 +71,7 @@ public class HiloElisabetha extends Thread {
     }
 
     /**
-     * MODIFICADO: Maneja respuesta "MERCADO_ATACADO" cuando el dragon lo destruyo.
+     * MODIFICADO: Maneja respuesta "LUGAR_DESTRUIDO" (y compatibilidad con "MERCADO_ATACADO").
      */
     private void visitarMercado() {
         System.out.println("[ELISABETHA] Va al Mercado...");
@@ -82,8 +82,7 @@ public class HiloElisabetha extends Thread {
             sal.writeUTF("VISITAR_MERCADO"); sal.writeUTF("Elisabetha");
 
             String estado = ent.readUTF();
-            if (estado.equals("MERCADO_ATACADO")) {
-                // NUEVO: el mercado esta destruido por el dragon
+            if (estado.equals("LUGAR_DESTRUIDO") || estado.equals("MERCADO_ATACADO")) {
                 System.out.println("[ELISABETHA] El mercado esta en llamas! Huye!");
             } else {
                 int n = ent.readInt(); String[] p = new String[n];
@@ -146,9 +145,13 @@ public class HiloElisabetha extends Thread {
             DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
             DataInputStream ent = new DataInputStream(sk.getInputStream());
             sal.writeUTF("REGISTRAR_CHISPA_100"); sal.writeUTF("ELISABETHA"); ent.readUTF();
-            // NOTA: ESPERAR_AL_OTRO ahora espera TAMBIEN a que el dragon sea derrotado
-            sal.writeUTF("ESPERAR_AL_OTRO"); sal.writeUTF("ELISABETHA"); ent.readUTF();
-            System.out.println("[ELISABETHA] *** FINAL FELIZ (Dragon derrotado + Chispa 100) ***");
+            sal.writeUTF("ESPERAR_AL_OTRO"); sal.writeUTF("ELISABETHA");
+            String resp = ent.readUTF();
+            if ("FINAL_FELIZ".equals(resp)) {
+                System.out.println("[ELISABETHA] *** FINAL FELIZ (Dragon derrotado + Chispa 100) ***");
+            } else if ("LUGAR_DESTRUIDO".equals(resp)) {
+                System.out.println("[ELISABETHA] La taberna arde! Sale corriendo y espera fuera.");
+            }
             sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
         } catch (IOException e) { System.out.println("[ELISABETHA] Error final: " + e.getMessage()); }
     }

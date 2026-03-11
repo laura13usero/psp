@@ -97,7 +97,8 @@ public class HiloLance extends Thread {
 
             String tipo = ent.readUTF();
             if (tipo.equals("LUGAR_DESTRUIDO")) {
-                ent.readUTF(); ent.readUTF(); // Leer los datos que ya envio el servidor
+                try { ent.readUTF(); } catch (IOException ex) { }
+                try { ent.readUTF(); } catch (IOException ex) { }
                 System.out.println("[LANCE] El Porton esta en llamas! No puede vigilar!");
             } else {
                 ent.readUTF(); ent.readUTF();
@@ -153,9 +154,13 @@ public class HiloLance extends Thread {
             DataOutputStream sal = new DataOutputStream(sk.getOutputStream());
             DataInputStream ent = new DataInputStream(sk.getInputStream());
             sal.writeUTF("REGISTRAR_CHISPA_100"); sal.writeUTF("LANCE"); ent.readUTF();
-            // ESPERAR_AL_OTRO: ahora espera TAMBIEN a dragon derrotado
-            sal.writeUTF("ESPERAR_AL_OTRO"); sal.writeUTF("LANCE"); ent.readUTF();
-            System.out.println("[LANCE] *** FINAL FELIZ (Dragon derrotado + Chispa 100) ***");
+            sal.writeUTF("ESPERAR_AL_OTRO"); sal.writeUTF("LANCE");
+            String resp = ent.readUTF();
+            if ("FINAL_FELIZ".equals(resp)) {
+                System.out.println("[LANCE] *** FINAL FELIZ (Dragon derrotado + Chispa 100) ***");
+            } else if ("LUGAR_DESTRUIDO".equals(resp)) {
+                System.out.println("[LANCE] La taberna arde! Sale corriendo y espera fuera.");
+            }
             sal.writeUTF("DESCONECTAR"); ent.readUTF(); sk.close();
         } catch (IOException e) { System.out.println("[LANCE] Error final: " + e.getMessage()); }
     }
