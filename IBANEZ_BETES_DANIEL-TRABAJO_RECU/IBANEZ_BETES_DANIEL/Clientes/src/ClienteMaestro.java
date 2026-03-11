@@ -23,6 +23,9 @@ public class ClienteMaestro {
 
     public static volatile boolean dragonAtacando = false;
 
+    // Version 2.0: Ratones Caballero
+    public static volatile boolean ratonesDanados = false;
+
     public static volatile boolean simulacionTerminada = false;
 
     public static void main(String[] args) {

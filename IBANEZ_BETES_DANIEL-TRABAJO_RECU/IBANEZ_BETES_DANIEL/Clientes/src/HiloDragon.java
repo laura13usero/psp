@@ -7,66 +7,143 @@ public class HiloDragon extends Thread {
 
     @Override
     public void run() {
-        System.out.println("[DRAGON] El Dragon Carmesi mora en las montanas...");
-
-
+        System.out.println("[DRAGON] El Dragon de Ceniza Carmesi duerme en las montanas del Este...");
 
         while (!ClienteMaestro.simulacionTerminada) {
-            // Elegir lugar aleatorio para atacar: 0=Mercado y porton, 1=Mercado y taberna, 2=porton y taberna
-            int lugar = random.nextInt(3);
+            // Dormir 120 segundos antes de comprobar si emerge
+            System.out.println("[DRAGON] El Dragon duerme en su guarida. Proxima comprobacion en 120 segundos...");
+            try { Thread.sleep(120000); } catch (InterruptedException e) { }
 
-            ClienteMaestro.dragonAtacando = true;
-            System.out.println("[DRAGON] *** EL DRAGON CARMESI DESPIERTA Y ATACA! ***");
+            if (ClienteMaestro.simulacionTerminada) break;
 
-            switch (lugar) {
-                case 0:
+            // 25% de probabilidad de aparecer
+            int prob = random.nextInt(100);
+            if (prob < 25) {
+                // El dragon aparece
+                System.out.println("");
+                System.out.println("============================================================");
+                System.out.println("  *** EL DRAGON DE CENIZA CARMESI HA DESPERTADO ***");
+                System.out.println("  Un rugido ensordecedor recorre las tierras de Roedalia!");
+                System.out.println("  El cielo se tine de rojo y las montanas tiemblan!");
+                System.out.println("============================================================");
+                System.out.println("");
 
-                    int a = random.nextInt(100);
-                    if (a < 80) { atacarLugar(ClienteMaestro.PUERTO_MERCADO, "MERCADO"); }
-                    else if (a > 80) { System.out.println("El Mercado no ha sido destruido."); };
+                ClienteMaestro.dragonAtacando = true;
 
-                    int c = random.nextInt(100);
-                    if (c < 60) { atacarLugar(ClienteMaestro.PUERTO_PORTON, "PORTON"); }
-                    else if (c > 60) { System.out.println("El Porton no ha sido destruido."); };
+                // Elegir 2 lugares DISTINTOS para atacar
+                // 0 = Mercado, 1 = Porton Norte, 2 = Taberna
+                String[] nombresLugares = {"MERCADO", "PORTON", "TABERNA"};
+                int[] puertos = {ClienteMaestro.PUERTO_MERCADO, ClienteMaestro.PUERTO_PORTON, ClienteMaestro.PUERTO_TABERNA};
+                int[] probDestruccion = {80, 60, 30};
 
-                    break;
+                int lugar1 = random.nextInt(3);
+                int lugar2;
+                do { lugar2 = random.nextInt(3); } while (lugar2 == lugar1);
 
-                case 1:
+                // Primer ataque
+                System.out.println("[DRAGON] Dirige su furia hacia: " + nombresLugares[lugar1] + "!");
 
-                    int b = random.nextInt(100);
-                    if (b < 80) { atacarLugar(ClienteMaestro.PUERTO_MERCADO, "MERCADO"); }
-                    else if (b > 80) { System.out.println("El Mercado no ha sido destruido."); };
+                // Comprobar si los Ratones Caballero detienen el ataque
+                boolean detenido1 = false;
+                if (!ClienteMaestro.ratonesDanados) {
+                    int defensa = random.nextInt(100);
+                    if (defensa < 20) {
+                        detenido1 = true;
+                        System.out.println("[RATONES CABALLERO] Han detenido el ataque al " + nombresLugares[lugar1] + "!");
+                        System.out.println("[DRAGON] RUGE CON FURIA! Los ratones le han frenado!");
+                    } else {
+                        System.out.println("[RATONES CABALLERO] No logran detener al Dragon en " + nombresLugares[lugar1] + "!");
+                        // 50% de que los ratones queden danados
+                        if (random.nextInt(100) < 50) {
+                            ClienteMaestro.ratonesDanados = true;
+                            System.out.println("[RATONES CABALLERO] Han resultado DANADOS en el enfrentamiento!");
+                            System.out.println("[RATONES CABALLERO] Necesitan 20 segundos para recuperarse...");
+                            // Hilo de recuperacion
+                            new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try { Thread.sleep(20000); } catch (InterruptedException e) { }
+                                    ClienteMaestro.ratonesDanados = false;
+                                    System.out.println("[RATONES CABALLERO] Se han recuperado! Vuelven al combate!");
+                                }
+                            }).start();
+                        }
+                    }
+                } else {
+                    System.out.println("[RATONES CABALLERO] Estan danados! No pueden intervenir!");
+                }
 
-                    int e = random.nextInt(100);
-                    if (e < 30) { atacarLugar(ClienteMaestro.PUERTO_TABERNA, "TABERNA"); }
-                    else if (e > 30) { System.out.println("La Taberna no ha sido destruida."); }
+                if (!detenido1) {
+                    int tirada = random.nextInt(100);
+                    if (tirada < probDestruccion[lugar1]) {
+                        atacarLugar(puertos[lugar1], nombresLugares[lugar1]);
+                        System.out.println("[DRAGON] " + nombresLugares[lugar1] + " ha sido REDUCIDO A CENIZAS!");
+                    } else {
+                        System.out.println("[DRAGON] " + nombresLugares[lugar1] + " resiste el embate del Dragon!");
+                    }
+                }
 
-                    break;
+                // 6 segundos por intento de ataque
+                try { Thread.sleep(6000); } catch (InterruptedException e) { }
 
-                case 2:
+                // Segundo ataque
+                System.out.println("[DRAGON] Ahora dirige su furia hacia: " + nombresLugares[lugar2] + "!");
 
-                    int d = random.nextInt(100);
-                    if (d < 60) { atacarLugar(ClienteMaestro.PUERTO_PORTON, "PORTON"); }
-                    else if (d > 60) { System.out.println("El Porton no ha sido destruido."); };
+                boolean detenido2 = false;
+                if (!ClienteMaestro.ratonesDanados) {
+                    int defensa2 = random.nextInt(100);
+                    if (defensa2 < 20) {
+                        detenido2 = true;
+                        System.out.println("[RATONES CABALLERO] Han detenido el ataque al " + nombresLugares[lugar2] + "!");
+                        System.out.println("[DRAGON] RUGE CON FURIA! Los ratones le han frenado!");
+                    } else {
+                        System.out.println("[RATONES CABALLERO] No logran detener al Dragon en " + nombresLugares[lugar2] + "!");
+                        // 50% de que los ratones queden danados
+                        if (random.nextInt(100) < 50) {
+                            ClienteMaestro.ratonesDanados = true;
+                            System.out.println("[RATONES CABALLERO] Han resultado DANADOS en el enfrentamiento!");
+                            System.out.println("[RATONES CABALLERO] Necesitan 20 segundos para recuperarse...");
+                            new Thread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try { Thread.sleep(20000); } catch (InterruptedException e) { }
+                                    ClienteMaestro.ratonesDanados = false;
+                                    System.out.println("[RATONES CABALLERO] Se han recuperado! Vuelven al combate!");
+                                }
+                            }).start();
+                        }
+                    }
+                } else {
+                    System.out.println("[RATONES CABALLERO] Estan danados! No pueden intervenir!");
+                }
 
-                    int f = random.nextInt(100);
-                    if (f < 30) { atacarLugar(ClienteMaestro.PUERTO_TABERNA, "TABERNA"); }
-                    else if (f > 30) { System.out.println("La Taberna no ha sido destruida."); }
+                if (!detenido2) {
+                    int tirada2 = random.nextInt(100);
+                    if (tirada2 < probDestruccion[lugar2]) {
+                        atacarLugar(puertos[lugar2], nombresLugares[lugar2]);
+                        System.out.println("[DRAGON] " + nombresLugares[lugar2] + " ha sido REDUCIDO A CENIZAS!");
+                    } else {
+                        System.out.println("[DRAGON] " + nombresLugares[lugar2] + " resiste el embate del Dragon!");
+                    }
+                }
 
-                    break;
+                // 6 segundos por intento de ataque
+                try { Thread.sleep(6000); } catch (InterruptedException e) { }
+
+                ClienteMaestro.dragonAtacando = false;
+
+                System.out.println("");
+                System.out.println("============================================================");
+                System.out.println("  El Dragon de Ceniza Carmesi se retira a su guarida...");
+                System.out.println("  Las montanas del Este guardan silencio una vez mas.");
+                System.out.println("============================================================");
+                System.out.println("");
+
+            } else {
+                // No aparece, sigue dormido
+                System.out.println("[DRAGON] El Dragon sigue dormido en las montanas...");
             }
-
-            // El dragon permanece atacando 6 segundos antes de retirarse
-            try { Thread.sleep(6000); } catch (InterruptedException e) { }
-            ClienteMaestro.dragonAtacando = false;
-
-
-            // Dormir antes de volver a atacar (120 seg)
-            int sueno = 120000;
-            System.out.println("[DRAGON] Se retira a las montanas. Despertará en " + (sueno/1000) + "segundos.");
-            try { Thread.sleep(sueno); } catch (InterruptedException e) { }
         }
-
     }
 
     private void atacarLugar(int puerto, String nombreLugar) {
@@ -75,9 +152,8 @@ public class HiloDragon extends Thread {
             DataOutputStream salida = new DataOutputStream(sk.getOutputStream());
             DataInputStream entrada = new DataInputStream(sk.getInputStream());
 
-            // enviar ataque (el servidor procesara este comando en su switch)
             salida.writeUTF("ATAQUE_DRAGON");
-            String respuesta = entrada.readUTF(); // "LUGAR_DESTRUIDO"
+            String respuesta = entrada.readUTF();
             System.out.println("[DRAGON] Ataca " + nombreLugar + "! Respuesta: " + respuesta);
 
             salida.writeUTF("DESCONECTAR");
@@ -88,4 +164,3 @@ public class HiloDragon extends Thread {
         }
     }
 }
-
